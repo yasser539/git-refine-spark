@@ -1,103 +1,315 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import { useState, useEffect } from "react";
+import Layout from "./components/Layout";
+import { useAuth } from "./context/AuthContext";
+import { supabase } from "../lib/supabase";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Users, 
+  Package, 
+  DollarSign, 
+  ShoppingCart,
+  Truck,
+  Clock,
+  Star,
+  Activity,
+  RefreshCw
+} from "lucide-react";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+interface DashboardStats {
+  totalOrders: number;
+  totalRevenue: number;
+  totalCustomers: number;
+  totalDrivers: number;
+  activeOrders: number;
+  completedOrders: number;
+  averageDeliveryTime: string;
+  customerSatisfaction: number;
+}
+
+export default function Dashboard() {
+  const { user, permissions } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalCustomers: 0,
+    totalDrivers: 0,
+    activeOrders: 0,
+    completedOrders: 0,
+    averageDeliveryTime: "0 دقيقة",
+    customerSatisfaction: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // جلب إحصائيات لوحة التحكم
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // جلب إحصائيات الطلبات
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*');
+
+      if (ordersError) throw ordersError;
+
+      // جلب إحصائيات العملاء
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('is_active', true);
+
+      if (customersError) throw customersError;
+
+      // جلب إحصائيات الموظفين (كباتن التوصيل)
+      const { data: driversData, error: driversError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('role', 'deliverer')
+        .eq('status', 'active');
+
+      if (driversError) throw driversError;
+
+      // حساب الإحصائيات
+      const totalOrders = ordersData.length;
+      const totalRevenue = ordersData.reduce((sum: number, order: any) => sum + (order.total_amount || 0), 0);
+      const totalCustomers = customersData.length;
+      const totalDrivers = driversData.length;
+      const activeOrders = ordersData.filter((order: any) => 
+        order.status === 'pending' || order.status === 'delivering'
+      ).length;
+      const completedOrders = ordersData.filter((order: any) => 
+        order.status === 'delivered'
+      ).length;
+
+      // حساب متوسط وقت التوصيل (افتراضي)
+      const averageDeliveryTime = "25 دقيقة";
+
+      // حساب رضا العملاء (افتراضي)
+      const customerSatisfaction = 4.5;
+
+      setStats({
+        totalOrders,
+        totalRevenue,
+        totalCustomers,
+        totalDrivers,
+        activeOrders,
+        completedOrders,
+        averageDeliveryTime,
+        customerSatisfaction
+      });
+
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      setError('فشل في جلب إحصائيات لوحة التحكم');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // جلب البيانات عند تحميل الصفحة
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  // تحديث البيانات كل دقيقة
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardStats();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const statsCards = [
+    {
+      title: "إجمالي الطلبات",
+      value: stats.totalOrders,
+      change: "+12%",
+      trend: "up",
+      icon: ShoppingCart,
+      color: "bg-gradient-to-br from-blue-500 to-blue-600",
+      bgColor: "bg-blue-50"
+    },
+    {
+      title: "إجمالي الإيرادات",
+      value: `${stats.totalRevenue.toFixed(2)} ريال`,
+      change: "+8%",
+      trend: "up",
+      icon: DollarSign,
+      color: "bg-gradient-to-br from-green-500 to-green-600",
+      bgColor: "bg-green-50"
+    },
+    {
+      title: "العملاء النشطين",
+      value: stats.totalCustomers,
+      change: "+5%",
+      trend: "up",
+      icon: Users,
+      color: "bg-gradient-to-br from-purple-500 to-purple-600",
+      bgColor: "bg-purple-50"
+    },
+    {
+      title: "كباتن التوصيل",
+      value: stats.totalDrivers,
+      change: "+2",
+      trend: "up",
+      icon: Truck,
+      color: "bg-gradient-to-br from-orange-500 to-orange-600",
+      bgColor: "bg-orange-50"
+    }
+  ];
+
+  const performanceCards = [
+    {
+      title: "الطلبات النشطة",
+      value: stats.activeOrders,
+      icon: Activity,
+      color: "bg-yellow-500",
+      description: "طلبات قيد المعالجة والتوصيل"
+    },
+    {
+      title: "الطلبات المكتملة",
+      value: stats.completedOrders,
+      icon: Package,
+      color: "bg-green-500",
+      description: "طلبات تم توصيلها بنجاح"
+    },
+    {
+      title: "متوسط وقت التوصيل",
+      value: stats.averageDeliveryTime,
+      icon: Clock,
+      color: "bg-blue-500",
+      description: "الوقت المتوسط للتوصيل"
+    },
+    {
+      title: "رضا العملاء",
+      value: `${stats.customerSatisfaction}/5`,
+      icon: Star,
+      color: "bg-purple-500",
+      description: "متوسط تقييم العملاء"
+    }
+  ];
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <Activity className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">خطأ في تحميل البيانات</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button 
+            onClick={fetchDashboardStats} 
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            إعادة المحاولة
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">لوحة التحكم</h1>
+            <p className="text-gray-600">مرحباً بك، {user?.name || 'المستخدم'}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={fetchDashboardStats}
+              disabled={loading}
+              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'جاري التحديث...' : 'تحديث'}
+            </button>
+            <div className="text-sm text-gray-500">
+              آخر تحديث: {new Date().toLocaleString('ar-SA')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {statsCards.map((stat) => (
+          <div key={stat.title} className={`bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow duration-300 ${stat.bgColor}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
+                <p className="text-2xl font-bold text-gray-900 mb-2">{stat.value}</p>
+                <div className="flex items-center">
+                  {stat.trend === "up" ? (
+                    <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
+                  )}
+                  <span className={`text-sm font-medium ${stat.trend === "up" ? "text-green-600" : "text-red-600"}`}>
+                    {stat.change}
+                  </span>
+                  <span className="text-sm text-gray-500 mr-1">من الشهر الماضي</span>
+                </div>
+              </div>
+              <div className={`p-3 rounded-xl ${stat.color}`}>
+                <stat.icon className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Performance Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {performanceCards.map((card) => (
+          <div key={card.title} className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className={`p-3 rounded-xl ${card.color}`}>
+                <card.icon className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">{card.title}</h3>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 mb-2">{card.value}</p>
+            <p className="text-sm text-gray-600">{card.description}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">النشاط الأخير</h3>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">تم إضافة طلب جديد</p>
+              <p className="text-xs text-gray-500">منذ 5 دقائق</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">تم تسجيل عميل جديد</p>
+              <p className="text-xs text-gray-500">منذ 15 دقيقة</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">تم تحديث حالة طلب</p>
+              <p className="text-xs text-gray-500">منذ 30 دقيقة</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Layout>
   );
 }
+

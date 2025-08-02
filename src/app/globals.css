@@ -1,26 +1,714 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Modern Button Styles */
+  .btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all duration-200 font-medium;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium;
+  }
+  
+  .btn-danger {
+    @apply bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium;
+  }
+  
+  .btn-success {
+    @apply bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors font-medium;
+  }
+  
+  /* Card Styles */
+  .card {
+    @apply bg-white rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300;
+  }
+  
+  .card-header {
+    @apply px-6 py-4 border-b border-gray-200;
+  }
+  
+  .card-body {
+    @apply p-6;
+  }
+  
+  /* Form Styles */
+  .form-input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors;
+  }
+  
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+  }
+  
+  .form-select {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors;
+  }
+  
+  /* Status Badges */
+  .badge-success {
+    @apply inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800;
+  }
+  
+  .badge-warning {
+    @apply inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800;
+  }
+  
+  .badge-danger {
+    @apply inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800;
+  }
+  
+  .badge-info {
+    @apply inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800;
+  }
+  
+  /* Table Styles */
+  .table-container {
+    @apply bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100;
+  }
+  
+  .table-header {
+    @apply px-6 py-4 border-b border-gray-200;
+  }
+  
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+  
+  .table-head {
+    @apply bg-gray-50;
+  }
+  
+  .table-head-cell {
+    @apply px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+  
+  .table-body {
+    @apply bg-white divide-y divide-gray-200;
+  }
+  
+  .table-row {
+    @apply hover:bg-gray-50 transition-colors;
+  }
+  
+  .table-cell {
+    @apply px-6 py-4 whitespace-nowrap;
+  }
+  
+  /* Modal Styles */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50;
+  }
+  
+  .modal-container {
+    @apply relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-xl bg-white;
+  }
+  
+  /* Navigation Styles */
+  .nav-item {
+    @apply flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200;
+  }
+  
+  .nav-item-active {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg;
+  }
+  
+  .nav-item-inactive {
+    @apply text-blue-100 hover:bg-blue-700 hover:text-white;
+  }
+  
+  /* Priority-based styling for sidebar items */
+  .nav-item[data-priority="1"] {
+    @apply font-semibold;
+  }
+  
+  .nav-item[data-priority="2"] {
+    @apply font-medium;
+  }
+  
+  .nav-item[data-priority="3"] {
+    @apply font-normal text-blue-200;
+  }
+  
+  /* Stats Card Styles */
+  .stats-card {
+    @apply bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-shadow duration-300;
+  }
+  
+  .stats-card-gradient {
+    @apply p-3 rounded-xl;
+  }
+  
+  /* Filter Styles */
+  .filter-container {
+    @apply bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-100;
+  }
+  
+  /* Search Input */
+  .search-input {
+    @apply w-full pr-10 pl-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  
+  /* Action Buttons */
+  .action-btn {
+    @apply p-1 rounded hover:bg-gray-100 transition-colors;
+  }
+  
+  .action-btn-edit {
+    @apply text-blue-600 hover:text-blue-900;
+  }
+  
+  .action-btn-delete {
+    @apply text-red-600 hover:text-red-900;
+  }
+  
+  .action-btn-view {
+    @apply text-gray-400 hover:text-gray-600;
+  }
+  
+  /* Avatar Styles */
+  .avatar {
+    @apply h-12 w-12 rounded-full flex items-center justify-center text-white font-medium text-lg;
+  }
+  
+  .avatar-gradient-blue {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600;
+  }
+  
+  .avatar-gradient-purple {
+    @apply bg-gradient-to-r from-purple-500 to-pink-600;
+  }
+  
+  /* Loading States */
+  .loading {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
+  
+  /* Empty States */
+  .empty-state {
+    @apply text-center py-12;
+  }
+  
+  .empty-state-icon {
+    @apply h-12 w-12 text-gray-400 mx-auto mb-4;
+  }
+  
+  .empty-state-title {
+    @apply text-lg font-medium text-gray-900 mb-2;
+  }
+  
+  .empty-state-description {
+    @apply text-gray-600;
+  }
+  
+  /* Product Card Styles */
+  .product-card {
+    @apply bg-white rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden;
+  }
+  
+  .product-image-container {
+    @apply relative h-48 overflow-hidden;
+  }
+  
+  .product-image {
+    @apply w-full h-full object-cover transition-transform duration-300 group-hover:scale-105;
+  }
+  
+  .product-overlay {
+    @apply absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-end p-4;
+  }
+  
+  .product-status {
+    @apply inline-flex px-2 py-1 text-xs font-medium rounded-full border;
+  }
+  
+  .product-actions {
+    @apply flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200;
+  }
+  
+  .product-content {
+    @apply p-6;
+  }
+  
+  .product-header {
+    @apply flex items-start justify-between mb-3;
+  }
+  
+  .product-title {
+    @apply text-lg font-bold text-gray-900 mb-1;
+  }
+  
+  .product-category {
+    @apply inline-flex px-2 py-1 text-xs font-medium rounded-full border;
+  }
+  
+  .product-description {
+    @apply text-sm text-gray-600 mb-4;
+  }
+  
+  .product-stats {
+    @apply space-y-3 mb-4;
+  }
+  
+  .product-price {
+    @apply flex items-center justify-between;
+  }
+  
+  .price-current {
+    @apply text-lg font-bold text-gray-900;
+  }
+  
+  .price-original {
+    @apply text-sm text-gray-500 line-through;
+  }
+  
+  .product-rating {
+    @apply flex items-center justify-between;
+  }
+  
+  .rating-text {
+    @apply text-sm font-medium text-gray-900;
+  }
+  
+  .reviews-count {
+    @apply text-xs text-gray-500;
+  }
+  
+  .product-footer {
+    @apply flex items-center justify-between text-xs text-gray-500;
+  }
+  
+  .sales-info, .date-info {
+    @apply flex items-center gap-1;
+  }
+  
+  .sales-text, .date-text {
+    @apply text-xs;
+  }
+  
+  /* Table Enhancements */
+  .product-thumbnail {
+    @apply w-12 h-12 rounded-lg overflow-hidden ml-3 flex-shrink-0;
+  }
+  
+  .thumbnail-image {
+    @apply w-full h-full object-cover;
+  }
+  
+  .product-info {
+    @apply flex-1;
+  }
+  
+  .product-name {
+    @apply text-sm font-medium text-gray-900;
+  }
+  
+  .price-display {
+    @apply flex flex-col;
+  }
+  
+  .rating-display {
+    @apply flex flex-col;
+  }
+  
+  .sales-display {
+    @apply flex items-center;
+  }
+  
+  .action-buttons {
+    @apply flex items-center gap-2;
+  }
+  
+  /* Modal Enhancements */
+  .modal-header {
+    @apply flex items-center justify-between mb-6;
+  }
+  
+  .modal-title {
+    @apply text-xl font-bold text-gray-900;
+  }
+  
+  .modal-close {
+    @apply text-gray-400 hover:text-gray-600 transition-colors;
+  }
+  
+  .modal-content {
+    @apply flex-1;
+  }
+  
+  .modal-footer {
+    @apply flex justify-end space-x-3 space-x-reverse mt-6 pt-6 border-t border-gray-200;
+  }
+  
+  /* Image Upload Styles */
+  .image-upload-container {
+    @apply border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all duration-200 hover:border-blue-400;
+  }
+  
+  .image-preview-container {
+    @apply relative;
+  }
+  
+  .image-preview {
+    @apply mx-auto h-48 w-full max-w-xs object-cover rounded-lg shadow-lg;
+  }
+  
+  .remove-image-btn {
+    @apply absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors;
+  }
+  
+  .upload-success {
+    @apply text-sm text-green-600 font-medium mt-2;
+  }
+  
+  .upload-placeholder {
+    @apply space-y-4;
+  }
+  
+  .upload-icon {
+    @apply mx-auto h-16 w-16 text-gray-400;
+  }
+  
+  .upload-text {
+    @apply space-y-2;
+  }
+  
+  .upload-title {
+    @apply text-lg font-medium text-gray-700;
+  }
+  
+  .upload-subtitle {
+    @apply text-sm text-gray-500;
+  }
+  
+  .upload-button {
+    @apply mt-4 inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors;
+  }
+  
+  .form-textarea {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400;
+  }
+  
+  /* Inventory Card Styles */
+  .inventory-card {
+    @apply bg-white rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 overflow-hidden;
+  }
+  
+  .inventory-header {
+    @apply p-6 border-b border-gray-100;
+  }
+  
+  .product-info {
+    @apply flex items-center mb-4;
+  }
+  
+  .product-thumbnail {
+    @apply w-12 h-12 rounded-lg overflow-hidden ml-3 flex-shrink-0;
+  }
+  
+  .product-name {
+    @apply text-lg font-bold text-gray-900 mb-1;
+  }
+  
+  .product-category {
+    @apply inline-flex px-2 py-1 text-xs font-medium rounded-full border;
+  }
+  
+  .stock-indicator {
+    @apply flex items-center justify-between;
+  }
+  
+  .stock-bar {
+    @apply h-2 rounded-full transition-all duration-300;
+  }
+  
+  .stock-percentage {
+    @apply text-sm font-medium text-gray-600;
+  }
+  
+  .inventory-stats {
+    @apply p-6 space-y-3;
+  }
+  
+  .stat-row {
+    @apply flex items-center justify-between;
+  }
+  
+  .stat-label {
+    @apply text-sm text-gray-600;
+  }
+  
+  .stat-value {
+    @apply text-sm font-medium text-gray-900;
+  }
+  
+  .inventory-footer {
+    @apply p-6 border-t border-gray-100 flex items-center justify-between;
+  }
+  
+  .location-info {
+    @apply flex items-center gap-1;
+  }
+  
+  .location-text {
+    @apply text-xs text-gray-500;
+  }
+  
+  /* Table Enhancements for Inventory */
+  .stock-display {
+    @apply space-y-2;
+  }
+  
+  .stock-amount {
+    @apply text-sm font-medium text-gray-900;
+  }
+  
+  .stock-progress {
+    @apply w-full bg-gray-200 rounded-full h-2;
+  }
+  
+  .stock-progress-bar {
+    @apply h-2 rounded-full transition-all duration-300;
+  }
+  
+  .value-display {
+    @apply flex flex-col;
+  }
+  
+  .value-amount {
+    @apply text-sm font-medium text-gray-900;
+  }
+  
+  .value-per-unit {
+    @apply text-xs text-gray-500;
+  }
+  
+  .inventory-status {
+    @apply inline-flex px-2 py-1 text-xs font-medium rounded-full border;
+  }
+  
+  .location-display {
+    @apply flex items-center;
+  }
+  
+  .date-display {
+    @apply flex items-center;
+  }
+  
+  .date-text {
+    @apply text-xs text-gray-500;
+  }
+  
+  /* Stock Adjustment Modal */
+  .current-stock-info {
+    @apply space-y-4;
+  }
+  
+  .stat-card {
+    @apply bg-gray-50 rounded-lg p-4 border border-gray-200;
+  }
+  
+  .stock-adjustment {
+    @apply space-y-4;
+  }
+  
+  .adjustment-btn {
+    @apply flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors;
+  }
+  
+  .adjustment-btn-add {
+    @apply bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-200;
+  }
+  
+  .adjustment-btn-remove {
+    @apply bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200;
+  }
+  
+  .adjustment-btn-clear {
+    @apply bg-red-100 text-red-800 hover:bg-red-200 border border-red-200;
+  }
+  
+  /* Action Button Enhancements */
+  .action-btn-success {
+    @apply text-emerald-600 hover:text-emerald-900 hover:bg-emerald-50;
+  }
+  
+  .action-btn-warning {
+    @apply text-amber-600 hover:text-amber-900 hover:bg-amber-50;
+  }
+  
+  /* Dark Mode Enhancements */
+  .dark .stats-card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .filter-container {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .search-input {
+    @apply bg-gray-700 border-gray-600 text-white placeholder-gray-400;
+  }
+  
+  .dark .form-input {
+    @apply bg-gray-700 border-gray-600 text-white placeholder-gray-400;
+  }
+  
+  .dark .form-select {
+    @apply bg-gray-700 border-gray-600 text-white;
+  }
+  
+  .dark .table-container {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .table-head {
+    @apply bg-gray-700;
+  }
+  
+  .dark .table-body {
+    @apply bg-gray-800;
+  }
+  
+  .dark .table-row {
+    @apply hover:bg-gray-700;
+  }
+  
+  .dark .table-cell {
+    @apply text-gray-300;
+  }
+  
+  .dark .table-head-cell {
+    @apply text-gray-400;
+  }
+  
+  .dark .product-card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .product-title {
+    @apply text-white;
+  }
+  
+  .dark .product-description {
+    @apply text-gray-400;
+  }
+  
+  .dark .price-current {
+    @apply text-white;
+  }
+  
+  .dark .rating-text {
+    @apply text-white;
+  }
+  
+  .dark .modal-container {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark .modal-title {
+    @apply text-white;
+  }
+  
+  .dark .image-upload-container {
+    @apply border-gray-600 hover:border-blue-400;
+  }
+  
+  .dark .upload-title {
+    @apply text-gray-300;
+  }
+  
+  .dark .upload-subtitle {
+    @apply text-gray-500;
+  }
+  
+  .dark .upload-button {
+    @apply bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600;
+  }
+}
+
+@layer utilities {
+  /* Custom Scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E0 #F7FAFC;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #F7FAFC;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #CBD5E0;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #A0AEC0;
+  }
+  
+  /* Focus Styles */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+  
+  /* Animation Classes */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
