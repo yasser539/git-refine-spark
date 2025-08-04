@@ -1,0 +1,29 @@
+{
+  "name": "image-url-migration",
+  "version": "1.0.0",
+  "description": "سكريبت لتحويل روابط الصور من المسارات المحلية إلى الروابط المباشرة",
+  "main": "migrate-image-urls.js",
+  "type": "module",
+  "scripts": {
+    "migrate": "node migrate-image-urls.js",
+    "migrate:dry-run": "node migrate-image-urls.js --dry-run",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "supabase",
+    "migration",
+    "image-urls",
+    "storage"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 

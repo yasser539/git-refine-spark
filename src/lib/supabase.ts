@@ -146,4 +146,29 @@ export interface AuditLog {
   ip_address: string
   user_agent: string
   created_at: string
+}
+
+// =====================================================
+// NEW TYPES FOR ADS, NOTIFICATIONS, AND SLOGANS
+// =====================================================
+
+export interface Ad {
+  id: string
+  image_url: string
+  storage_bucket: string
+  storage_path?: string
+  created_at: string
+}
+
+export interface Notification {
+  id: string
+  message: string
+  created_at: string
+}
+
+export interface Slogan {
+  id: string
+  title: string
+  slogan_text: string
+  created_at: string
 } 

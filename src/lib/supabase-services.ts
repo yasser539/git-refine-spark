@@ -576,6 +576,22 @@ export const notificationsService = {
     }
   },
 
+  // جلب جميع التنبيهات
+  async getAllNotifications() {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get all notifications error:', error);
+      return [];
+    }
+  },
+
   // إنشاء إشعار جديد
   async createNotification(notificationData: Partial<Notification>) {
     try {
@@ -607,6 +623,22 @@ export const notificationsService = {
       return data;
     } catch (error) {
       console.error('Mark notification as read error:', error);
+      throw error;
+    }
+  },
+
+  // حذف تنبيه
+  async deleteNotification(notificationId: string) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Delete notification error:', error);
       throw error;
     }
   }
@@ -651,6 +683,233 @@ export const auditLogService = {
     } catch (error) {
       console.error('Get audit logs error:', error);
       return [];
+    }
+  }
+};
+
+// =====================================================
+// ADS SERVICES - خدمات الإعلانات
+// =====================================================
+
+export const adsService = {
+  // جلب جميع الإعلانات
+  async getAllAds() {
+    try {
+      const { data, error } = await supabase
+        .from('ads')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get all ads error:', error);
+      return [];
+    }
+  },
+
+  // إنشاء إعلان جديد
+  async createAd(adData: Partial<Ad>) {
+    try {
+      // إضافة القيم الافتراضية إذا لم يتم توفيرها
+      const adWithDefaults = {
+        storage_bucket: 'img',
+        ...adData
+      };
+
+      // إذا كان image_url يحتوي على رابط كامل، استخدمه كما هو
+      // وإلا، افترض أنه مسار محلي واحصل على الرابط العام
+      if (adData.image_url && !adData.image_url.startsWith('http')) {
+        // تحويل المسار المحلي إلى رابط عام
+        adWithDefaults.image_url = this.getPublicUrl(adData.image_url);
+      }
+
+      const { data, error } = await supabase
+        .from('ads')
+        .insert(adWithDefaults)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Create ad error:', error);
+      throw error;
+    }
+  },
+
+  // تحديث إعلان
+  async updateAd(adId: string, adData: Partial<Ad>) {
+    try {
+      const { data, error } = await supabase
+        .from('ads')
+        .update(adData)
+        .eq('id', adId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Update ad error:', error);
+      throw error;
+    }
+  },
+
+  // حذف إعلان
+  async deleteAd(adId: string) {
+    try {
+      const { error } = await supabase
+        .from('ads')
+        .delete()
+        .eq('id', adId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Delete ad error:', error);
+      throw error;
+    }
+  },
+
+  // رفع صورة إعلان إلى Storage
+  async uploadAdImage(file: File, fileName: string) {
+    try {
+      // تنظيف اسم الملف للتأكد من أنه آمن
+      const cleanFileName = fileName
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/\s+/g, '_')
+        .toLowerCase();
+      
+      const storagePath = `ads/${cleanFileName}`;
+      
+      console.log('📤 رفع الملف إلى Storage:', storagePath);
+      
+      const { data, error } = await supabase.storage
+        .from('img')
+        .upload(storagePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('❌ خطأ في رفع الملف:', error);
+        throw error;
+      }
+
+      // الحصول على الرابط العام المباشر
+      const publicUrl = this.getPublicUrl(storagePath);
+      
+      console.log('✅ تم رفع الملف بنجاح:', storagePath);
+      console.log('🔗 الرابط العام:', publicUrl);
+      
+      return {
+        path: storagePath,
+        publicUrl: publicUrl,
+        success: true
+      };
+    } catch (error) {
+      console.error('Error uploading ad image:', error);
+      return null;
+    }
+  },
+
+  // الحصول على رابط الصورة العامة
+  getPublicUrl(storagePath: string) {
+    const { data } = supabase.storage
+      .from('img')
+      .getPublicUrl(storagePath);
+    
+    return data.publicUrl;
+  },
+
+  // حذف صورة إعلان من Storage
+  async deleteAdImage(storagePath: string) {
+    try {
+      const { error } = await supabase.storage
+        .from('img')
+        .remove([storagePath]);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error deleting ad image:', error);
+      return false;
+    }
+  }
+};
+
+
+
+// =====================================================
+// SLOGANS SERVICES - خدمات الشعارات
+// =====================================================
+
+export const slogansService = {
+  // جلب جميع الشعارات
+  async getAllSlogans() {
+    try {
+      const { data, error } = await supabase
+        .from('slogans')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get all slogans error:', error);
+      return [];
+    }
+  },
+
+  // إنشاء شعار جديد
+  async createSlogan(sloganData: Partial<Slogan>) {
+    try {
+      const { data, error } = await supabase
+        .from('slogans')
+        .insert(sloganData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Create slogan error:', error);
+      throw error;
+    }
+  },
+
+  // تحديث شعار
+  async updateSlogan(sloganId: string, sloganData: Partial<Slogan>) {
+    try {
+      const { data, error } = await supabase
+        .from('slogans')
+        .update({ ...sloganData, updated_at: new Date().toISOString() })
+        .eq('id', sloganId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Update slogan error:', error);
+      throw error;
+    }
+  },
+
+  // حذف شعار
+  async deleteSlogan(sloganId: string) {
+    try {
+      const { error } = await supabase
+        .from('slogans')
+        .delete()
+        .eq('id', sloganId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Delete slogan error:', error);
+      throw error;
     }
   }
 }; 

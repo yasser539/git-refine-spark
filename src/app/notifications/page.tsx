@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { adsService, notificationsService, slogansService } from "../../lib/supabase-services";
 import { 
   Bell, 
   Megaphone, 
@@ -29,25 +30,7 @@ import {
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-
-interface Ad {
-  id: string;
-  image_url: string;
-  created_at: string;
-}
-
-interface Notification {
-  id: string;
-  message: string;
-  created_at: string;
-}
-
-interface Slogan {
-  id: string;
-  title: string;
-  slogan_text: string;
-  created_at: string;
-}
+import type { Ad, Notification, Slogan } from "../../lib/supabase";
 
 interface NotificationStats {
   totalAds: number;
@@ -78,6 +61,18 @@ export default function NotificationsPage() {
     message: '',
     slogan_text: ''
   });
+  const [isCreating, setIsCreating] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // دالة للحصول على رابط الصورة العامة
+  const getImageUrl = (ad: Ad) => {
+    // إذا كان الرابط يبدأ بـ http، فهو رابط مباشر
+    if (ad.image_url.startsWith('http')) {
+      return ad.image_url;
+    }
+    // إذا كان مسار فقط، احصل على الرابط العام
+    return adsService.getPublicUrl(ad.image_url);
+  };
 
   // جلب البيانات
   const fetchData = async () => {
@@ -87,115 +82,28 @@ export default function NotificationsPage() {
 
       console.log('🔍 Starting to fetch notifications data...');
 
-      // استخدام بيانات تجريبية مؤقتة حتى يتم إنشاء الجداول
-      const mockAds: Ad[] = [
-        {
-          id: '1',
-          image_url: 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=400',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          image_url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          image_url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
-          created_at: new Date().toISOString()
-        }
-      ];
+      // جلب البيانات من قاعدة البيانات
+      const [adsData, notificationsData, slogansData] = await Promise.all([
+        adsService.getAllAds(),
+        notificationsService.getAllNotifications(),
+        slogansService.getAllSlogans()
+      ]);
 
-      const mockNotifications: Notification[] = [
-        {
-          id: '1',
-          message: 'صيانة النظام غداً من 2-4 صباحاً',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          message: 'تحديث جديد للتطبيق متاح الآن',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          message: 'عرض خاص على الحلويات 20% خصم',
-          created_at: new Date().toISOString()
-        }
-      ];
-
-      const mockSlogans: Slogan[] = [
-        {
-          id: '1',
-          title: 'شعار الشركة',
-          slogan_text: 'نحمل الماء إلى بابك بكل سهولة وأمان، خدمة 24 ساعة على مدار الأسبوع',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          title: 'شعار التوصيل',
-          slogan_text: 'توصيل سريع وآمن، نضمن لك وصول طلبك في الوقت المحدد وبأفضل جودة',
-          created_at: new Date().toISOString()
-        }
-      ];
-
-      // محاولة جلب البيانات من قاعدة البيانات
-      try {
-        console.log('📊 Attempting to fetch from database...');
-        const { data: adsData, error: adsError } = await supabase
-          .from('ads')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        const { data: notificationsData, error: notificationsError } = await supabase
-          .from('notifications')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        const { data: slogansData, error: slogansError } = await supabase
-          .from('slogans')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        // إذا نجح جلب البيانات من قاعدة البيانات، استخدمها
-        if (!adsError && !notificationsError && !slogansError) {
-          console.log('✅ Database data fetched successfully');
-          setAds(adsData || []);
-          setNotifications(notificationsData || []);
-          setSlogans(slogansData || []);
-        } else {
-          // إذا فشل، استخدم البيانات التجريبية
-          console.log('⚠️  Using mock data (database tables not found)');
-          setAds(mockAds);
-          setNotifications(mockNotifications);
-          setSlogans(mockSlogans);
-        }
-      } catch (dbError) {
-        console.log('⚠️  Database error, using mock data:', dbError);
-        setAds(mockAds);
-        setNotifications(mockNotifications);
-        setSlogans(mockSlogans);
-      }
+      setAds(adsData);
+      setNotifications(notificationsData);
+      setSlogans(slogansData);
 
       // حساب الإحصائيات
-      const currentAds = ads.length > 0 ? ads : mockAds;
-      const currentNotifications = notifications.length > 0 ? notifications : mockNotifications;
-      const currentSlogans = slogans.length > 0 ? slogans : mockSlogans;
-      
-      const totalAds = currentAds.length;
-      const totalNotifications = currentNotifications.length;
-      const totalSlogans = currentSlogans.length;
-
       setStats({
-        totalAds,
-        totalNotifications,
-        totalSlogans
+        totalAds: adsData.length,
+        totalNotifications: notificationsData.length,
+        totalSlogans: slogansData.length
       });
 
       console.log('📈 Stats calculated:', {
-        totalAds,
-        totalNotifications,
-        totalSlogans
+        totalAds: adsData.length,
+        totalNotifications: notificationsData.length,
+        totalSlogans: slogansData.length
       });
 
     } catch (error: unknown) {
@@ -223,126 +131,124 @@ export default function NotificationsPage() {
 
   const handleCreateItem = async () => {
     try {
+      setIsCreating(true);
+      setError(null);
+
       if (modalType === 'ad') {
-        // إنشاء إعلان جديد (صورة فقط)
-        const newAd: Ad = {
-          id: Date.now().toString(),
-          image_url: imagePreview || 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=400',
-          created_at: new Date().toISOString()
-        };
+        let imagePath = 'ads/sample-ad-1.jpg'; // مسار افتراضي
+        let storagePath = null;
+        let publicUrl = null;
 
-        // محاولة الإضافة إلى قاعدة البيانات
-        console.log('🔄 محاولة إضافة الإعلان إلى Supabase...');
-        const { data: insertedAd, error } = await supabase
-          .from('ads')
-          .insert([{
-            image_url: imagePreview || 'https://images.unsplash.com/photo-1481391319762-47dff72954d9?w=400'
-          }])
-          .select();
-
-        if (error) {
-          console.error('❌ خطأ في إضافة الإعلان إلى Supabase:', error);
-          console.log('⚠️  سيتم الإضافة محلياً فقط');
-          setAds(prevAds => [newAd, ...prevAds]);
-        } else {
-          console.log('✅ تم إضافة الإعلان إلى Supabase بنجاح:', insertedAd);
-          if (insertedAd && insertedAd[0]) {
-            setAds(prevAds => [insertedAd[0] as Ad, ...prevAds]);
+        // إذا تم اختيار صورة جديدة، ارفعها إلى Storage
+        if (selectedImage) {
+          console.log('📤 رفع الصورة إلى Storage...');
+          
+          // التحقق من نوع الملف
+          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+          if (!allowedTypes.includes(selectedImage.type)) {
+            throw new Error('نوع الملف غير مدعوم. يرجى اختيار صورة (JPG, PNG, GIF, WebP)');
+          }
+          
+          // التحقق من حجم الملف (5MB كحد أقصى)
+          const maxSize = 5 * 1024 * 1024; // 5MB
+          if (selectedImage.size > maxSize) {
+            throw new Error('حجم الملف كبير جداً. الحد الأقصى 5MB');
+          }
+          
+          // تنظيف اسم الملف - إزالة المسافات والأحرف الخاصة
+          const cleanFileName = selectedImage.name
+            .replace(/[^a-zA-Z0-9.-]/g, '_') // استبدال الأحرف الخاصة بـ _
+            .replace(/\s+/g, '_') // استبدال المسافات بـ _
+            .toLowerCase(); // تحويل إلى أحرف صغيرة
+          
+          const fileName = `${Date.now()}-${cleanFileName}`;
+          console.log('📝 اسم الملف النظيف:', fileName);
+          
+          const uploadResult = await adsService.uploadAdImage(selectedImage, fileName);
+          
+          if (uploadResult && uploadResult.success) {
+            imagePath = uploadResult.path;
+            storagePath = uploadResult.path;
+            publicUrl = uploadResult.publicUrl;
+            console.log('✅ تم رفع الصورة بنجاح:', imagePath);
           } else {
-            setAds(prevAds => [newAd, ...prevAds]);
+            throw new Error('فشل في رفع الصورة');
           }
         }
 
-        // إعادة حساب الإحصائيات
-        const currentAds = [newAd, ...ads];
-        setStats(prev => ({
-          ...prev,
-          totalAds: currentAds.length
-        }));
+        console.log('📝 إنشاء الإعلان في قاعدة البيانات...');
+        // إنشاء إعلان جديد - تخزين الرابط العام المباشر
+        const newAd = await adsService.createAd({
+          image_url: publicUrl || imagePath, // استخدام الرابط العام المباشر
+          storage_path: storagePath
+        });
+
+        if (newAd) {
+          setAds(prevAds => [newAd, ...prevAds]);
+          setStats(prev => ({
+            ...prev,
+            totalAds: prev.totalAds + 1
+          }));
+          console.log('✅ تم إنشاء الإعلان بنجاح:', newAd);
+        } else {
+          throw new Error('فشل في إنشاء الإعلان');
+        }
 
       } else if (modalType === 'notification') {
-        // إنشاء تنبيه جديد (نص 30 حرف)
-        const newNotification: Notification = {
-          id: Date.now().toString(),
-          message: formData.message,
-          created_at: new Date().toISOString()
-        };
+        console.log('📝 إنشاء التنبيه...');
+        // إنشاء تنبيه جديد
+        const newNotification = await notificationsService.createNotification({
+          message: formData.message
+        });
 
-        // محاولة الإضافة إلى قاعدة البيانات
-        console.log('🔄 محاولة إضافة التنبيه إلى Supabase...');
-        const { data: insertedNotification, error } = await supabase
-          .from('notifications')
-          .insert([{
-            message: formData.message
-          }])
-          .select();
-
-        if (error) {
-          console.error('❌ خطأ في إضافة التنبيه إلى Supabase:', error);
-          console.log('⚠️  سيتم الإضافة محلياً فقط');
+        if (newNotification) {
           setNotifications(prevNotifications => [newNotification, ...prevNotifications]);
+          setStats(prev => ({
+            ...prev,
+            totalNotifications: prev.totalNotifications + 1
+          }));
+          console.log('✅ تم إنشاء التنبيه بنجاح:', newNotification);
         } else {
-          console.log('✅ تم إضافة التنبيه إلى Supabase بنجاح:', insertedNotification);
-          if (insertedNotification && insertedNotification[0]) {
-            setNotifications(prevNotifications => [insertedNotification[0] as Notification, ...prevNotifications]);
-          } else {
-            setNotifications(prevNotifications => [newNotification, ...prevNotifications]);
-          }
+          throw new Error('فشل في إنشاء التنبيه');
         }
-
-        // إعادة حساب الإحصائيات
-        const currentNotifications = [newNotification, ...notifications];
-        setStats(prev => ({
-          ...prev,
-          totalNotifications: currentNotifications.length
-        }));
 
       } else if (modalType === 'slogan') {
-        // إنشاء شعار جديد (عنوان + نص 120 حرف)
-        const newSlogan: Slogan = {
-          id: Date.now().toString(),
+        console.log('📝 إنشاء الشعار...');
+        // إنشاء شعار جديد
+        const newSlogan = await slogansService.createSlogan({
           title: formData.title,
-          slogan_text: formData.slogan_text,
-          created_at: new Date().toISOString()
-        };
+          slogan_text: formData.slogan_text
+        });
 
-        // محاولة الإضافة إلى قاعدة البيانات
-        console.log('🔄 محاولة إضافة الشعار إلى Supabase...');
-        const { data: insertedSlogan, error } = await supabase
-          .from('slogans')
-          .insert([{
-            title: formData.title,
-            slogan_text: formData.slogan_text
-          }])
-          .select();
-
-        if (error) {
-          console.error('❌ خطأ في إضافة الشعار إلى Supabase:', error);
-          console.log('⚠️  سيتم الإضافة محلياً فقط');
+        if (newSlogan) {
           setSlogans(prevSlogans => [newSlogan, ...prevSlogans]);
+          setStats(prev => ({
+            ...prev,
+            totalSlogans: prev.totalSlogans + 1
+          }));
+          console.log('✅ تم إنشاء الشعار بنجاح:', newSlogan);
         } else {
-          console.log('✅ تم إضافة الشعار إلى Supabase بنجاح:', insertedSlogan);
-          if (insertedSlogan && insertedSlogan[0]) {
-            setSlogans(prevSlogans => [insertedSlogan[0] as Slogan, ...prevSlogans]);
-          } else {
-            setSlogans(prevSlogans => [newSlogan, ...prevSlogans]);
-          }
+          throw new Error('فشل في إنشاء الشعار');
         }
-
-        // إعادة حساب الإحصائيات
-        const currentSlogans = [newSlogan, ...slogans];
-        setStats(prev => ({
-          ...prev,
-          totalSlogans: currentSlogans.length
-        }));
       }
 
       setShowCreateModal(false);
       resetForm();
+      
+      // إظهار رسالة نجاح
+      const successMsg = modalType === 'ad' ? 'تم إضافة الإعلان بنجاح!' :
+                        modalType === 'notification' ? 'تم إضافة التنبيه بنجاح!' :
+                        'تم إضافة الشعار بنجاح!';
+      setSuccessMessage(successMsg);
+      
+      // إخفاء رسالة النجاح بعد 3 ثوان
+      setTimeout(() => setSuccessMessage(null), 3000);
 
     } catch (error) {
-      console.error('Error creating item:', error);
-      setError('فشل في إنشاء العنصر');
+      console.error('❌ Error creating item:', error);
+      setError(`فشل في إنشاء العنصر: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -350,38 +256,27 @@ export default function NotificationsPage() {
     if (!confirm('هل أنت متأكد من حذف هذا العنصر؟')) return;
 
     try {
-      let table: string;
       if ('image_url' in item) {
-        table = 'ads';
-      } else if ('slogan_text' in item) {
-        table = 'slogans';
-      } else {
-        table = 'notifications';
-      }
-      
-      console.log(`🔄 محاولة حذف ${table === 'ads' ? 'الإعلان' : table === 'notifications' ? 'التنبيه' : 'الشعار'} من Supabase...`);
-      const { error } = await supabase
-        .from(table)
-        .delete()
-        .eq('id', item.id);
-
-      if (error) {
-        console.error(`❌ خطأ في حذف ${table} من Supabase:`, error);
-        console.log('⚠️  سيتم الحذف محلياً فقط');
-      } else {
-        console.log(`✅ تم حذف ${table} من Supabase بنجاح`);
-      }
-
-      // تحديث البيانات المحلية
-      if (table === 'ads') {
+        // حذف إعلان
+        await adsService.deleteAd(item.id);
+        
+        // حذف الصورة من Storage إذا كانت موجودة
+        if (item.storage_path) {
+          await adsService.deleteAdImage(item.storage_path);
+        }
+        
         setAds(prevAds => prevAds.filter(ad => ad.id !== item.id));
         setStats(prev => ({ ...prev, totalAds: prev.totalAds - 1 }));
-      } else if (table === 'notifications') {
-        setNotifications(prevNotifications => prevNotifications.filter(notification => notification.id !== item.id));
-        setStats(prev => ({ ...prev, totalNotifications: prev.totalNotifications - 1 }));
-      } else {
+      } else if ('slogan_text' in item) {
+        // حذف شعار
+        await slogansService.deleteSlogan(item.id);
         setSlogans(prevSlogans => prevSlogans.filter(slogan => slogan.id !== item.id));
         setStats(prev => ({ ...prev, totalSlogans: prev.totalSlogans - 1 }));
+      } else {
+        // حذف تنبيه
+        await notificationsService.deleteNotification(item.id);
+        setNotifications(prevNotifications => prevNotifications.filter(notification => notification.id !== item.id));
+        setStats(prev => ({ ...prev, totalNotifications: prev.totalNotifications - 1 }));
       }
 
     } catch (error) {
@@ -432,6 +327,25 @@ export default function NotificationsPage() {
             </Button>
           </div>
         </div>
+
+        {/* رسائل النجاح والخطأ */}
+        {successMessage && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-600 ml-2" />
+              <span className="text-green-800">{successMessage}</span>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <XCircle className="h-5 w-5 text-red-600 ml-2" />
+              <span className="text-red-800">{error}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -545,7 +459,7 @@ export default function NotificationsPage() {
                   <CardContent className="p-4">
                     <div className="mb-4">
                       <img 
-                        src={ad.image_url} 
+                        src={getImageUrl(ad)} 
                         alt="إعلان"
                         className="w-full h-48 object-cover rounded-lg"
                       />
@@ -807,11 +721,26 @@ export default function NotificationsPage() {
                     <input
                       id="image-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
+                          // التحقق من نوع الملف
+                          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                          if (!allowedTypes.includes(file.type)) {
+                            setError('نوع الملف غير مدعوم. يرجى اختيار صورة (JPG, PNG, GIF, WebP)');
+                            return;
+                          }
+                          
+                          // التحقق من حجم الملف (5MB كحد أقصى)
+                          const maxSize = 5 * 1024 * 1024; // 5MB
+                          if (file.size > maxSize) {
+                            setError('حجم الملف كبير جداً. الحد الأقصى 5MB');
+                            return;
+                          }
+                          
                           setSelectedImage(file);
+                          setError(null); // مسح أي أخطاء سابقة
                           const reader = new FileReader();
                           reader.onload = (e) => {
                             setImagePreview(e.target?.result as string);
@@ -906,14 +835,23 @@ export default function NotificationsPage() {
               <Button
                 onClick={handleCreateItem}
                 disabled={
-                  (modalType === 'ad' && !imagePreview) ||
+                  isCreating ||
                   (modalType === 'notification' && !formData.message) ||
                   (modalType === 'slogan' && (!formData.title || !formData.slogan_text))
                 }
                 className="flex-1 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
               >
-                {modalType === 'ad' ? 'إضافة الإعلان' : 
-                 modalType === 'notification' ? 'إضافة التنبيه' : 'إضافة الشعار'}
+                {isCreating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
+                    جاري الإضافة...
+                  </>
+                ) : (
+                  <>
+                    {modalType === 'ad' ? 'إضافة الإعلان' : 
+                     modalType === 'notification' ? 'إضافة التنبيه' : 'إضافة الشعار'}
+                  </>
+                )}
               </Button>
             </div>
           </div>
