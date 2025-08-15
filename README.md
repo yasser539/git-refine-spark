@@ -200,3 +200,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_production_supabase_anon_key
 ---
 
 **ملاحظة**: تأكد من إعداد Supabase بشكل صحيح قبل تشغيل المشروع. راجع `SUPABASE_SETUP.md` للحصول على تعليمات مفصلة.
+# candy_dashboard_admin
