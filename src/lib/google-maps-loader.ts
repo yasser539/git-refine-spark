@@ -3,7 +3,7 @@
 
 declare global {
   interface Window {
-    google: any;
+  google: any;
     initMap: () => void;
   }
 }
@@ -14,7 +14,7 @@ let loadPromise: Promise<void> | null = null;
 
 export const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
   // If already loaded, return immediately
-  if (isLoaded && window.google && window.google.maps) {
+  if (isLoaded && (window as any).google?.maps) {
     return Promise.resolve();
   }
 
@@ -29,7 +29,7 @@ export const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
     // Wait for existing script to load
     return new Promise((resolve, reject) => {
       const checkGoogleMaps = () => {
-        if (window.google && window.google.maps) {
+  if ((window as any).google?.maps) {
           isLoaded = true;
           isLoading = false;
           resolve();
@@ -45,8 +45,9 @@ export const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
   isLoading = true;
   loadPromise = new Promise((resolve, reject) => {
     try {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initMap`;
+  const script = document.createElement('script');
+  // Request Arabic localization and Saudi region so map UI and labels appear in Arabic
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=ar&region=SA&callback=initMap`;
       script.async = true;
       script.defer = true;
       script.id = 'google-maps-script';
@@ -60,7 +61,7 @@ export const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
       // Define callback function
       window.initMap = () => {
         setTimeout(() => {
-          if (window.google && window.google.maps) {
+          if ((window as any).google?.maps) {
             isLoaded = true;
             isLoading = false;
             resolve();
@@ -84,5 +85,5 @@ export const loadGoogleMapsAPI = (apiKey: string): Promise<void> => {
 };
 
 export const isGoogleMapsLoaded = (): boolean => {
-  return isLoaded && !!(window.google && window.google.maps);
+  return isLoaded && !!((window as any).google?.maps);
 }; 

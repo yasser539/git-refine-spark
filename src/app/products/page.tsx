@@ -7,35 +7,26 @@ import { useAuth } from "../context/AuthContext";
 import { databaseService, storageService } from "../../lib/database-services";
 import { 
   Package, 
-  Plus, 
+  Plus,
   Edit, 
   Trash2, 
   Eye, 
   EyeOff, 
   Search,
-  Filter,
-  MoreVertical,
-  PackagePlus,
-  TrendingUp,
-  TrendingDown,
   Star,
   ShoppingCart,
-  DollarSign,
   Image as ImageIcon,
   Download,
   Upload,
   RefreshCw,
-  Bell,
   X,
   Grid3X3,
   List,
-  SortAsc,
   Calendar,
-  Users,
-  Zap,
   Shield,
   AlertCircle,
-  Loader2
+  Loader2,
+  TrendingUp
 } from "lucide-react";
 
 interface Product {
@@ -211,7 +202,7 @@ export default function ProductsManagement() {
     
     return matchesSearch && matchesCategory && matchesStatus;
   }).sort((a, b) => {
-    let aValue: any, bValue: any;
+    let aValue: string | number | Date, bValue: string | number | Date;
     
     switch (sortBy) {
       case "name":

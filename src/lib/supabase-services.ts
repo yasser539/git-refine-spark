@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { User, Permissions, Order, Customer, Merchant, Employee, Product, Inventory, Notification, AuditLog } from './supabase';
+import type { User, Permissions, Order, Customer, Merchant, Employee, Product, AuditLog, Ad, Slogan, DeliveryCaptain, DeliveryWorkLog, DeliveryPerformanceMonthly } from './supabase';
 
 // =====================================================
 // AUTHENTICATION SERVICES
@@ -262,7 +262,7 @@ export const ordersService = {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .update({ status, updated_at: new Date().toISOString() })
+  .update({ status, updated_at: new Date().toISOString() })
         .eq('id', orderId)
         .select()
         .single();
@@ -338,55 +338,478 @@ export const customersService = {
 // MERCHANTS SERVICES
 // =====================================================
 
+// مخطط جديد للتجار وفق SQL المرسل
+export type MerchantDb = {
+  merchant_id: string;
+  store_name: string;
+  owner_name: string;
+  phone_e164?: string | null;
+  phone_display?: string | null;
+  address: string;
+  status: 'pending' | 'approved' | 'rejected';
+  terms_accepted_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export const merchantsService = {
-  // جلب جميع التجار
-  async getAllMerchants() {
+  // جلب جميع التجار بالمخطط الجديد
+  async getAllMerchants(): Promise<MerchantDb[]> {
     try {
       const { data, error } = await supabase
         .from('merchants')
-        .select('*')
+        .select(
+          'merchant_id, store_name, owner_name, phone_e164, phone_display, address, status, terms_accepted_at, created_at, updated_at'
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return (data || []) as MerchantDb[];
     } catch (error) {
       console.error('Get all merchants error:', error);
-      return [];
+      return [] as MerchantDb[];
     }
   },
 
-  // إنشاء تاجر جديد
-  async createMerchant(merchantData: Partial<Merchant>) {
+  // إنشاء تاجر جديد بالمخطط الجديد
+  async createMerchant(payload: Partial<MerchantDb>): Promise<MerchantDb> {
     try {
+      const insertPayload = {
+        store_name: payload.store_name,
+        owner_name: payload.owner_name,
+        phone_e164: payload.phone_e164 ?? payload.phone_display ?? null,
+        phone_display: payload.phone_display ?? payload.phone_e164 ?? null,
+        address: payload.address,
+        status: (payload.status as MerchantDb['status']) ?? 'pending',
+        terms_accepted_at: payload.terms_accepted_at ?? null
+      };
+
       const { data, error } = await supabase
         .from('merchants')
-        .insert(merchantData)
-        .select()
+        .insert(insertPayload)
+        .select(
+          'merchant_id, store_name, owner_name, phone_e164, phone_display, address, status, terms_accepted_at, created_at, updated_at'
+        )
         .single();
 
       if (error) throw error;
-      return data;
+      return data as MerchantDb;
     } catch (error) {
       console.error('Create merchant error:', error);
       throw error;
     }
   },
 
-  // تحديث بيانات التاجر
-  async updateMerchant(merchantId: string, merchantData: Partial<Merchant>) {
+  // تحديث بيانات التاجر بالمخطط الجديد
+  async updateMerchant(merchantId: string, updates: Partial<MerchantDb>): Promise<MerchantDb> {
     try {
+      const updatePayload = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
       const { data, error } = await supabase
         .from('merchants')
-        .update({ ...merchantData, updated_at: new Date().toISOString() })
-        .eq('id', merchantId)
+        .update(updatePayload)
+        .eq('merchant_id', merchantId)
+        .select(
+          'merchant_id, store_name, owner_name, phone_e164, phone_display, address, status, terms_accepted_at, created_at, updated_at'
+        )
+        .single();
+
+      if (error) throw error;
+      return data as MerchantDb;
+    } catch (error) {
+      console.error('Update merchant error:', error);
+      throw error;
+    }
+  },
+
+  async deleteMerchant(merchantId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('merchants')
+        .delete()
+        .eq('merchant_id', merchantId);
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Delete merchant error:', error);
+      throw error;
+    }
+  }
+};
+
+// =====================================================
+// MERCHANT DOCUMENTS SERVICES
+// =====================================================
+
+export const merchantDocumentsService = {
+  async listDocuments(merchantId: string) {
+    const { data, error } = await supabase
+      .from('merchant_documents')
+      .select('*')
+      .eq('merchant_id', merchantId)
+      .order('uploaded_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async addDocument(payload: { merchant_id: string; doc_type: string; file_name: string; file_path: string; mime_type?: string; }) {
+    const { data, error } = await supabase
+      .from('merchant_documents')
+      .insert({ ...payload })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteDocument(id: string) {
+    const { error } = await supabase
+      .from('merchant_documents')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  // رفع ملف إلى Bucket عام (img) داخل مسار merchants/<merchant_id>/docs/
+  async uploadMerchantDoc(file: File, merchantId: string) {
+    const bucket = process.env.NEXT_PUBLIC_DOCS_BUCKET || 'img';
+    const cleanFile = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').toLowerCase();
+    const path = `merchants/${merchantId}/docs/${Date.now()}-${cleanFile}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(path, file);
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(path);
+
+    return { path, publicUrl };
+  }
+};
+
+// =====================================================
+// DELIVERY CAPTAINS SERVICES
+// =====================================================
+
+const CAPTAINS_BUCKET = process.env.NEXT_PUBLIC_CAPTAINS_BUCKET || 'captain-profiles';
+
+export const deliveryCaptainsService = {
+  // جلب جميع كباتن التوصيل
+  async getAllDeliveryCaptains() {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_captains')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Get all delivery captains error:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        status: error?.status,
+        error
+      });
+      // Fallback: use employees as delivery captains if dedicated table is missing
+      try {
+        const { data: employees, error: empError } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('role', 'deliverer')
+          .order('created_at', { ascending: false });
+        if (empError) throw empError;
+        return employees;
+      } catch (fallbackError: any) {
+        console.error('Fallback (employees) captains error:', {
+          message: fallbackError?.message,
+          code: fallbackError?.code,
+          details: fallbackError?.details,
+          hint: fallbackError?.hint,
+          status: fallbackError?.status,
+          error: fallbackError
+        });
+        return [];
+      }
+    }
+  },
+
+  // جلب كابتن توصيل واحد
+  async getDeliveryCaptain(captainId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_captains')
+        .select('*')
+        .eq('id', captainId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get delivery captain error:', error);
+      return null;
+    }
+  },
+
+  // إنشاء كابتن توصيل جديد
+  async createDeliveryCaptain(captainData: Partial<DeliveryCaptain>) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_captains')
+        .insert({
+          ...captainData,
+          avatar: captainData.name?.charAt(0) || 'ك',
+          department: 'التوصيل',
+          join_date: new Date().toISOString(),
+          performance: 0,
+          tasks: 0,
+          completed: 0,
+          rating: 0,
+          total_deliveries: 0,
+          total_earnings: 0,
+          commission_rate: 0,
+          is_verified: false,
+          background_check_status: 'pending'
+        })
         .select()
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Update merchant error:', error);
+      console.error('Create delivery captain error:', error);
       throw error;
+    }
+  },
+
+  // تحديث بيانات كابتن التوصيل
+  async updateDeliveryCaptain(captainId: string, captainData: Partial<DeliveryCaptain>) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_captains')
+        .update({ ...captainData, updated_at: new Date().toISOString() })
+        .eq('id', captainId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Update delivery captain error:', error);
+      throw error;
+    }
+  },
+
+  // حذف كابتن التوصيل
+  async deleteDeliveryCaptain(captainId: string) {
+    try {
+      const { error } = await supabase
+        .from('delivery_captains')
+        .delete()
+        .eq('id', captainId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Delete delivery captain error:', error);
+      throw error;
+    }
+  },
+
+  // جلب سجلات العمل لكابتن التوصيل
+  async getCaptainWorkLogs(captainId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_work_logs')
+        .select('*')
+        .eq('captain_id', captainId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get captain work logs error:', error);
+      return [];
+    }
+  },
+
+  // إضافة سجل عمل جديد
+  async createWorkLog(workLogData: Partial<DeliveryWorkLog>) {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_work_logs')
+        .insert(workLogData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Create work log error:', error);
+      throw error;
+    }
+  },
+
+  // جلب الأداء الشهري لكابتن التوصيل
+  async getCaptainPerformance(captainId: string, year?: number, month?: number) {
+    try {
+      let query = supabase
+        .from('delivery_performance_monthly')
+        .select('*')
+        .eq('captain_id', captainId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
+      if (year && month) {
+        query = query.eq('year', year).eq('month', month);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Get captain performance error:', error);
+      return [];
+    }
+  },
+
+  // رفع صورة شخصية لكابتن التوصيل
+  async uploadCaptainProfileImage(file: File, fileName: string) {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `captains/${fileName}.${fileExt}`;
+
+      // محاولة الرفع على البكت المحدد أو الافتراضي
+      const tryUpload = async (bucket: string) => {
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, file);
+        return { uploadError };
+      };
+
+      let { uploadError } = await tryUpload(CAPTAINS_BUCKET);
+
+      // في حال لم يوجد البكت، جرّب البكت 'img' كخطة بديلة
+      if (uploadError && /Bucket not found/i.test(String(uploadError.message))) {
+        const fallbackBucket = 'img';
+        const res = await tryUpload(fallbackBucket);
+        uploadError = res.uploadError;
+        if (!uploadError) {
+          // الحصول على الرابط العام من البكت الاحتياطي
+          const { data: { publicUrl } } = supabase.storage
+            .from(fallbackBucket)
+            .getPublicUrl(filePath);
+          return { success: true, path: filePath, publicUrl };
+        }
+      }
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      // الحصول على الرابط العام من البكت المعلن
+      const { data: { publicUrl } } = supabase.storage
+        .from(CAPTAINS_BUCKET)
+        .getPublicUrl(filePath);
+
+      return {
+        success: true,
+        path: filePath,
+        publicUrl: publicUrl
+      };
+    } catch (error) {
+      console.error('Upload captain profile image error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'خطأ في رفع الصورة'
+      };
+    }
+  },
+
+  // حذف صورة شخصية لكابتن التوصيل
+  async deleteCaptainProfileImage(storagePathOrUrl: string) {
+    try {
+      // Accept either a raw storage path (e.g., captains/abc.png) or a full public URL
+      const extractPath = (value: string): string => {
+        if (!value) return value as unknown as string;
+        try {
+          // If URL, derive the path after the bucket name
+          const url = new URL(value);
+          // Public URL format: https://.../storage/v1/object/public/<bucket>/<path>
+          const idx = url.pathname.indexOf(`/object/public/`);
+          if (idx !== -1) {
+            const after = url.pathname.substring(idx + `/object/public/`.length);
+            const parts = after.split('/');
+            // drop bucket segment
+            return parts.slice(1).join('/');
+          }
+          // Signed URLs may look different; try to find bucket name in path
+          const bucketIdx = url.pathname.indexOf(`/${CAPTAINS_BUCKET}/`);
+          if (bucketIdx !== -1) {
+            return url.pathname.substring(bucketIdx + CAPTAINS_BUCKET.length + 2);
+          }
+        } catch {
+          // Not a URL, treat as plain path
+        }
+        return value;
+      };
+
+      const storagePath = extractPath(storagePathOrUrl);
+
+      let { error } = await supabase.storage
+        .from(CAPTAINS_BUCKET)
+        .remove([storagePath]);
+
+      if (error && /Bucket not found/i.test(String(error.message))) {
+        // جرّب البكت الاحتياطي
+        const res = await supabase.storage
+          .from('img')
+          .remove([storagePath]);
+        error = res.error as any;
+      }
+
+      if (error) {
+        console.error('Delete captain profile image error:', error);
+        throw error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Delete captain profile image error:', error);
+      return false;
+    }
+  },
+
+  // الحصول على الرابط العام لصورة كابتن التوصيل
+  getCaptainProfileUrl(storagePath: string) {
+    const { data: { publicUrl } } = supabase.storage
+      .from(CAPTAINS_BUCKET)
+      .getPublicUrl(storagePath);
+    return publicUrl;
+  },
+
+  // حساب إحصائيات كابتن التوصيل
+  async calculateCaptainStats(captainId: string) {
+    try {
+      const { data, error } = await supabase.rpc('calculate_captain_performance', {
+        captain_uuid: captainId
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Calculate captain stats error:', error);
+      return null;
     }
   }
 };
@@ -508,51 +931,9 @@ export const productsService = {
   }
 };
 
-// =====================================================
-// INVENTORY SERVICES
-// =====================================================
 
-export const inventoryService = {
-  // جلب جميع المخزون
-  async getAllInventory() {
-    try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select(`
-          *,
-          products(name, price, category)
-        `)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Get all inventory error:', error);
-      return [];
-    }
-  },
 
-  // تحديث كمية المخزون
-  async updateInventoryQuantity(inventoryId: string, quantity: number) {
-    try {
-      const { data, error } = await supabase
-        .from('inventory')
-        .update({ 
-          quantity, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', inventoryId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Update inventory quantity error:', error);
-      throw error;
-    }
-  }
-};
 
 // =====================================================
 // NOTIFICATIONS SERVICES

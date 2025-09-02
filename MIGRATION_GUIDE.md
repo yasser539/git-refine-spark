@@ -180,3 +180,19 @@ function revertToLocalPaths() {
 2. تأكد من صحة متغيرات البيئة
 3. اختبر الاتصال بقاعدة البيانات
 4. راجع صلاحيات المستخدم 
+ 
+---
+
+## تحديث مخطط الطلبات
+
+لتوحيد جداول الطلبات وعناصر الطلبات مع المخطط الجديد، قم بتشغيل الملف SQL التالي على قاعدة بياناتك:
+
+- update_orders_schema.sql
+
+الملف آمن للتشغيل المتكرر (idempotent) ويقوم بالتالي:
+- إنشاء نوع approval_status عند الحاجة
+- تحديث قيود الحالة إلى القيم: pending, confirmed, preparing, out_for_delivery, delivered, cancelled
+- إضافة أعمدة المبالغ: subtotal, total, final_amount, tax_amount, shipping_amount, discount_amount, voucher_discount
+- إضافة أعمدة الموافقة: approval_status, approved_by, approved_at, approval_notes
+- إنشاء التريجر لتحديث updated_at
+- إنشاء الفهارس المناسبة

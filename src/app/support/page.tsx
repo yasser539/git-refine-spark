@@ -7,15 +7,9 @@ import {
   MessageSquare, 
   AlertCircle, 
   CheckCircle, 
-  Clock, 
   User,
-  Phone,
-  Mail,
-  MapPin,
   Star,
-  Filter,
   Search,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -23,7 +17,9 @@ import {
   Activity,
   Users,
   Package,
-  Shield
+  Shield,
+  Plus,
+  Filter
 } from "lucide-react";
 
 interface Complaint {
@@ -384,12 +380,12 @@ export default function Support() {
                       <button className="text-blue-600 hover:text-blue-900">
                         <Eye size={16} />
                       </button>
-                      {permissions.canProcessComplaints && (
+                      {permissions.can_process_complaints && (
                         <button className="text-green-600 hover:text-green-900">
                           <Edit size={16} />
                         </button>
                       )}
-                      {permissions.canProcessComplaints && (
+                      {permissions.can_process_complaints && (
                         <button className="text-purple-600 hover:text-purple-900">
                           <MessageSquare size={16} />
                         </button>
@@ -471,7 +467,10 @@ export default function Support() {
                   <h4 className="font-medium text-gray-900 mb-2">تقييم الحل</h4>
                   <div className="flex items-center">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`h-5 w-5 ${i < selectedComplaint.rating! ? 'text-yellow-400' : 'text-gray-300'}`} />
+                      <Star 
+                        key={`rating-star-${selectedComplaint.id || 'unknown'}-${i}`}
+                        className={`h-5 w-5 ${i < selectedComplaint.rating! ? 'text-yellow-400' : 'text-gray-300'}`} 
+                      />
                     ))}
                     <span className="text-sm text-gray-600 mr-2">{selectedComplaint.rating}/5</span>
                   </div>

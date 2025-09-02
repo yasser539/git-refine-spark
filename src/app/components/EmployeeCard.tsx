@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
+import type { User, Permissions } from '../../lib/supabase';
 
 interface EmployeeCardProps {
-  employee: any;
+  employee: User;
   onEditPermissions: (employeeId: string) => void;
-  getEmployeePermissions: (employeeId: string) => Promise<any>;
+  getEmployeePermissions: (employeeId: string) => Promise<Permissions | null>;
 }
 
 export default function EmployeeCard({ employee, onEditPermissions, getEmployeePermissions }: EmployeeCardProps) {
-  const [employeePerms, setEmployeePerms] = useState<any>(null);
+  const [employeePerms, setEmployeePerms] = useState<Permissions | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function EmployeeCard({ employee, onEditPermissions, getEmployeeP
     { key: 'can_view_merchants', title: 'التجار' },
     { key: 'can_view_employees', title: 'الموظفين' },
     { key: 'can_view_products', title: 'المنتجات' },
-    { key: 'can_view_inventory', title: 'المخزون' },
+
     { key: 'can_view_reports', title: 'التقارير' },
     { key: 'can_view_audit_log', title: 'سجل العمليات' },
     { key: 'can_view_support', title: 'الدعم' },
@@ -49,11 +50,12 @@ export default function EmployeeCard({ employee, onEditPermissions, getEmployeeP
     { key: 'can_modify_prices', title: 'تعديل الأسعار' },
     { key: 'can_export_reports', title: 'تصدير تقارير' },
     { key: 'can_update_order_status', title: 'تحديث الطلبات' },
+
     { key: 'can_send_notifications', title: 'إرسال إشعارات' },
     { key: 'can_process_complaints', title: 'معالجة شكاوى' },
     { key: 'can_manage_merchants', title: 'إدارة التجار' },
     { key: 'can_manage_employees', title: 'إدارة الموظفين' },
-    { key: 'can_manage_inventory', title: 'إدارة المخزون' }
+
   ];
 
   return (

@@ -8,15 +8,12 @@ import {
   User, 
   Package, 
   ShoppingCart, 
-  Settings, 
   Trash2, 
   Edit, 
   Plus,
   Search,
   Filter,
   Download,
-  Calendar,
-  Clock,
   UserCheck,
   AlertTriangle,
   Eye,
@@ -33,7 +30,7 @@ interface AuditLog {
   userRole: string;
   timestamp: string;
   type: "create" | "update" | "delete" | "login" | "error";
-  category: "user" | "product" | "order" | "inventory" | "system";
+          category: "user" | "product" | "order" | "system" | "inventory";
   ipAddress: string;
   userAgent: string;
 }
@@ -91,6 +88,18 @@ export default function AuditLog() {
     },
     {
       id: "5",
+      action: "تحديث مخزون",
+      description: "تم تحديث كمية منتج: مياه طبيعية",
+      user: "أحمد محمد",
+      userRole: "موظف",
+      timestamp: "2024-01-20 16:10:15",
+      type: "update",
+      category: "inventory",
+      ipAddress: "192.168.1.104",
+      userAgent: "Chrome/120.0.0.0"
+    },
+    {
+      id: "6",
       action: "خطأ في النظام",
       description: "فشل في تحميل البيانات",
       user: "النظام",
@@ -109,7 +118,7 @@ export default function AuditLog() {
       userRole: "موظف",
       timestamp: "2024-01-20 16:05:45",
       type: "update",
-      category: "inventory",
+      
       ipAddress: "192.168.1.105",
       userAgent: "Chrome/120.0.0.0"
     },
@@ -172,7 +181,7 @@ export default function AuditLog() {
       case "user": return "bg-blue-100 text-blue-800";
       case "product": return "bg-green-100 text-green-800";
       case "order": return "bg-purple-100 text-purple-800";
-      case "inventory": return "bg-yellow-100 text-yellow-800";
+
       case "system": return "bg-gray-100 text-gray-800";
       default: return "bg-gray-100 text-gray-800";
     }
@@ -234,7 +243,7 @@ export default function AuditLog() {
             <p className="text-gray-600">مراقبة جميع العمليات والأنشطة في النظام</p>
           </div>
           <div className="flex items-center gap-3">
-            {permissions.canExportReports ? (
+            {permissions.can_export_reports ? (
               <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2">
                 <Download className="h-4 w-4" />
                 تصدير السجل
@@ -245,7 +254,7 @@ export default function AuditLog() {
                 <span className="text-sm">لا تملك صلاحية تصدير التقارير</span>
               </div>
             )}
-            {permissions.canExportReports && (
+            {permissions.can_export_reports && (
               <button className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2">
                 <Shield className="h-4 w-4" />
                 إعدادات الأمان
@@ -404,7 +413,8 @@ export default function AuditLog() {
                         {log.category === "user" ? "المستخدمين" : 
                          log.category === "product" ? "المنتجات" : 
                          log.category === "order" ? "الطلبات" : 
-                         log.category === "inventory" ? "المخزون" : "النظام"}
+                         log.category === "inventory" ? "المخزون" :
+                         "النظام"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{log.timestamp}</td>
@@ -468,7 +478,8 @@ export default function AuditLog() {
                         {selectedLog.category === "user" ? "المستخدمين" : 
                          selectedLog.category === "product" ? "المنتجات" : 
                          selectedLog.category === "order" ? "الطلبات" : 
-                         selectedLog.category === "inventory" ? "المخزون" : "النظام"}
+                         selectedLog.category === "inventory" ? "المخزون" :
+                         "النظام"}
                       </span>
                     </p>
                   </div>

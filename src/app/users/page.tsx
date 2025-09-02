@@ -6,25 +6,20 @@ import { useAuth } from "../context/AuthContext";
 import { databaseService } from "../../lib/database-services";
 import { 
   Users, 
-  Plus, 
   Edit, 
   Trash2, 
   Eye, 
   EyeOff, 
   Search,
-  Filter,
   MoreVertical,
-  UserPlus,
   User,
   Download,
   Upload,
   RefreshCw,
   TrendingUp,
-  MapPin,
-  Phone,
-  Mail,
-  Calendar,
-  Shield
+  Shield,
+  UserPlus,
+  Filter
 } from "lucide-react";
 
 interface Customer {
@@ -65,12 +60,12 @@ export default function CustomersManagement() {
       
       // تحويل البيانات إلى التنسيق المطلوب
       const formattedCustomers: Customer[] = customersData.map((customer: any) => ({
-        id: customer.id,
+        id: customer.id as string,
         name: customer.name || "غير محدد",
         phone: customer.phone || "غير محدد",
         status: customer.is_active ? "نشط" : "معطل",
-        createdAt: new Date(customer.created_at).toLocaleDateString('ar-SA'),
-        lastLogin: customer.last_login ? new Date(customer.last_login).toLocaleDateString('ar-SA') : "لم يسجل دخول",
+        createdAt: new Date(customer.created_at as string).toLocaleDateString('ar-SA'),
+        lastLogin: customer.last_login ? new Date(customer.last_login as string).toLocaleDateString('ar-SA') : "لم يسجل دخول",
         ordersCount: customer.orders_count || 0,
         rating: customer.rating || 0,
         location: customer.address || customer.location || "غير محدد",
@@ -102,12 +97,12 @@ export default function CustomersManagement() {
     try {
       const customersData = await databaseService.getCustomers();
       const formattedCustomers: Customer[] = customersData.map((customer: any) => ({
-        id: customer.id,
+        id: customer.id as string,
         name: customer.name || "غير محدد",
         phone: customer.phone || "غير محدد",
         status: customer.is_active ? "نشط" : "معطل",
-        createdAt: new Date(customer.created_at).toLocaleDateString('ar-SA'),
-        lastLogin: customer.last_login ? new Date(customer.last_login).toLocaleDateString('ar-SA') : "لم يسجل دخول",
+        createdAt: new Date(customer.created_at as string).toLocaleDateString('ar-SA'),
+        lastLogin: customer.last_login ? new Date(customer.last_login as string).toLocaleDateString('ar-SA') : "لم يسجل دخول",
         ordersCount: customer.orders_count || 0,
         rating: customer.rating || 0,
         location: customer.address || customer.location || "غير محدد",

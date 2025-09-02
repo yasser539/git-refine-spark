@@ -157,19 +157,35 @@ CREATE TABLE IF NOT EXISTS inventory (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
-    merchant_id UUID REFERENCES merchants(id) ON DELETE CASCADE,
-    deliverer_id UUID REFERENCES employees(id) ON DELETE SET NULL,
+    customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+    merchant_id UUID NULL REFERENCES merchants(id) ON DELETE CASCADE,
+    deliverer_id UUID NULL REFERENCES employees(id) ON DELETE SET NULL,
     
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'delivering', 'delivered', 'cancelled')),
-    total_amount DECIMAL(10,2) NOT NULL,
-    items JSONB NOT NULL DEFAULT '[]',
-    delivery_address TEXT NOT NULL,
-    delivery_phone VARCHAR(20) NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','preparing','out_for_delivery','delivered','cancelled')),
+    
+    total_amount NUMERIC(12,2) NOT NULL CHECK (total_amount >= 0),
+    total        NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
+    subtotal     NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
+    final_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (final_amount >= 0),
+    tax_amount   NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tax_amount >= 0),
+    shipping_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (shipping_amount >= 0),
+    discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (discount_amount >= 0),
+    voucher_discount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (voucher_discount >= 0),
+
+    items JSONB NULL,
+    delivery_address TEXT NOT NULL DEFAULT '',
+    delivery_phone TEXT NOT NULL DEFAULT '',
+    delivery_notes TEXT,
     notes TEXT,
     
     estimated_delivery_time TIMESTAMP WITH TIME ZONE,
     actual_delivery_time TIMESTAMP WITH TIME ZONE,
+
+    -- approvals
+    approval_status TEXT NOT NULL DEFAULT 'pending',
+    approved_by UUID NULL,
+    approved_at TIMESTAMP WITH TIME ZONE NULL,
+    approval_notes TEXT NULL,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -180,12 +196,12 @@ CREATE TABLE IF NOT EXISTS orders (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    quantity INTEGER NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
-    total_price DECIMAL(10,2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price NUMERIC(12,2) NOT NULL CHECK (unit_price >= 0),
+    total_price NUMERIC(12,2) NOT NULL CHECK (total_price >= 0),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- =====================================================

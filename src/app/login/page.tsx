@@ -3,16 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Eye, 
-  EyeOff, 
-  Lock, 
-  Mail, 
-  User, 
-  AlertCircle,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');

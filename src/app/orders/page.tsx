@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
 import { 
@@ -25,22 +26,22 @@ import {
   X,
   UserCheck,
   Users,
-  Target,
   ArrowRight,
-  Play,
-  StopCircle,
   UserPlus,
   Phone,
   Mail
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
+import { deliveryCaptainsService } from "@/lib/supabase-services";
+import { databaseService } from "@/lib/database-services";
 
 interface Order {
   id: string;
   customerName: string;
   customerPhone: string;
   customerAddress: string;
+  source?: 'customer' | 'merchant';
   driverName?: string;
   driverPhone?: string;
   items: Array<{
@@ -67,16 +68,53 @@ interface Driver {
   rating: number;
   totalDeliveries: number;
   currentLocation?: string;
+  position?: 'كابتن توصيل' | 'مندوب';
 }
 
 export default function OrdersManagement() {
+  const pathname = usePathname();
+  const isMerchants = pathname?.includes("/orders/merchants");
+  const isCustomers = pathname?.includes("/orders/customers");
   const { permissions, user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([
+    // أمثلة لطلبات التجار لعرض فصل القوائم
+    {
+      id: "M-ORD-5001",
+      customerName: "متجر الندى",
+      customerPhone: "+966555001001",
+      customerAddress: "سجل تجاري: 123456789 | جدة",
+      source: 'merchant',
+      items: [
+        { name: "توريد كراتين مياه 200 مل", quantity: 20, price: 10.0 },
+        { name: "توريد كراتين مياه 600 مل", quantity: 10, price: 14.0 }
+      ],
+      total: 340.0,
+      status: "قيد المراجعة",
+      paymentMethod: "محفظة إلكترونية",
+      createdAt: "2024-01-20 12:00",
+      isVisibleToDrivers: false
+    },
+    {
+      id: "M-ORD-5002",
+      customerName: "متجر الصفوة",
+      customerPhone: "+966555002002",
+      customerAddress: "سجل تجاري: 987654321 | الرياض",
+      source: 'merchant',
+      items: [
+        { name: "توريد كراتين مياه 330 مل", quantity: 15, price: 11.5 }
+      ],
+      total: 172.5,
+      status: "تم الموافقة وجاري البحث عن موصل",
+      paymentMethod: "بطاقة",
+      createdAt: "2024-01-20 12:15",
+      isVisibleToDrivers: true
+    },
     {
       id: "ORD-12345",
       customerName: "سارة أحمد",
       customerPhone: "+966501112223",
       customerAddress: "شارع الملك فهد، الرياض",
+      source: 'customer',
       driverName: "محمد علي",
       driverPhone: "+966501234567",
       items: [
@@ -96,6 +134,7 @@ export default function OrdersManagement() {
       customerName: "فاطمة محمد",
       customerPhone: "+966502223334",
       customerAddress: "حي النزهة، الرياض",
+      source: 'customer',
       items: [
         { name: "مياه فوارة", quantity: 3, price: 8.00 }
       ],
@@ -110,6 +149,7 @@ export default function OrdersManagement() {
       customerName: "خالد عبدالله",
       customerPhone: "+966503334445",
       customerAddress: "حي الملقا، الرياض",
+      source: 'customer',
       driverName: "أحمد حسن",
       driverPhone: "+966507654321",
       items: [
@@ -130,6 +170,7 @@ export default function OrdersManagement() {
       customerName: "علي محمد",
       customerPhone: "+966504445556",
       customerAddress: "حي العليا، الرياض",
+      source: 'customer',
       items: [
         { name: "مياه معدنية", quantity: 2, price: 7.50 },
         { name: "مياه فوارة", quantity: 1, price: 8.00 }
@@ -145,6 +186,7 @@ export default function OrdersManagement() {
       customerName: "نور الهدى",
       customerPhone: "+966505556667",
       customerAddress: "حي الورود، الرياض",
+      source: 'customer',
       driverName: "علي أحمد",
       driverPhone: "+966509876543",
       items: [
@@ -164,6 +206,7 @@ export default function OrdersManagement() {
       customerName: "أحمد محمد",
       customerPhone: "+966506667778",
       customerAddress: "حي الملك عبدالله، الرياض",
+      source: 'customer',
       items: [
         { name: "مياه معدنية", quantity: 3, price: 7.50 },
         { name: "مياه فوارة", quantity: 1, price: 8.00 }
@@ -184,62 +227,72 @@ export default function OrdersManagement() {
   const [showAssignDriverModal, setShowAssignDriverModal] = useState(false);
   const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
+  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
 
-  // بيانات الموصّلين المتاحين
-  const availableDrivers: Driver[] = [
-    {
-      id: "driver-001",
-      name: "محمد علي",
-      phone: "+966501234567",
-      email: "mohammed.ali@example.com",
-      status: "متاح",
-      rating: 4.8,
-      totalDeliveries: 156,
-      currentLocation: "حي النزهة"
-    },
-    {
-      id: "driver-002",
-      name: "أحمد حسن",
-      phone: "+966507654321",
-      email: "ahmed.hassan@example.com",
-      status: "متاح",
-      rating: 4.9,
-      totalDeliveries: 203,
-      currentLocation: "حي الملقا"
-    },
-    {
-      id: "driver-003",
-      name: "علي أحمد",
-      phone: "+966509876543",
-      email: "ali.ahmed@example.com",
-      status: "مشغول",
-      rating: 4.7,
-      totalDeliveries: 89,
-      currentLocation: "حي الورود"
-    },
-    {
-      id: "driver-004",
-      name: "سعد محمد",
-      phone: "+966505555555",
-      email: "saad.mohammed@example.com",
-      status: "متاح",
-      rating: 4.6,
-      totalDeliveries: 134,
-      currentLocation: "حي العليا"
-    },
-    {
-      id: "driver-005",
-      name: "خالد عبدالله",
-      phone: "+966506666666",
-      email: "khalid.abdullah@example.com",
-      status: "متاح",
-      rating: 4.5,
-      totalDeliveries: 98,
-      currentLocation: "حي الملك عبدالله"
-    }
-  ];
+  // جلب قائمة الكوادر المناسبة: كباتن للعملاء أو مندوبين للتجار
+  useEffect(() => {
+    let isMounted = true;
 
-  const filteredOrders = orders.filter(order => {
+    const mapCaptainToDriver = (captain: any): Driver => ({
+      id: captain.id,
+      name: captain.name,
+      phone: captain.phone ?? "",
+      email: captain.email ?? "",
+      status: captain.status === "نشط" ? "متاح" : captain.status === "إجازة" ? "مشغول" : "غير متاح",
+      rating: Number(captain.rating ?? 0),
+      totalDeliveries: Number(captain.total_deliveries ?? 0),
+      currentLocation: captain.city || captain.region || captain.location || "",
+      position: captain.position as ('كابتن توصيل' | 'مندوب')
+    });
+
+    const mapEmployeeDelivererToDriver = (emp: any): Driver => ({
+      id: emp.id,
+      name: emp.name,
+      phone: emp.phone ?? "",
+      email: emp.email ?? "",
+      status: emp.status === "active" ? "متاح" : "غير متاح",
+      rating: Number(emp.rating ?? 0),
+      totalDeliveries: Number(emp.total_deliveries ?? 0),
+      currentLocation: emp.city || emp.region || emp.location || "",
+      position: 'كابتن توصيل'
+    });
+
+    (async () => {
+      try {
+        // المحاولة الأولى: جدول delivery_captains
+        const captains = await deliveryCaptainsService.getAllDeliveryCaptains();
+        if (isMounted && Array.isArray(captains) && captains.length > 0) {
+          const mapped = captains.map(mapCaptainToDriver);
+          const filteredByRole = isMerchants
+            ? mapped.filter(d => d.position === 'مندوب')
+            : mapped.filter(d => d.position === 'كابتن توصيل');
+          setAvailableDrivers(filteredByRole);
+          return;
+        }
+
+        // المحاولة الثانية: جدول employees بدور deliverer
+        const employees = await databaseService.getDeliveryCaptains();
+        if (isMounted && Array.isArray(employees) && employees.length > 0) {
+          // موظفو deliverer يُعتبرون كباتن توصيل فقط (لصفحة العملاء)
+          const mapped = employees.map(mapEmployeeDelivererToDriver);
+          const filtered = isMerchants ? [] : mapped;
+          setAvailableDrivers(filtered);
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to load delivery captains:', error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredOrders = orders
+    // فلترة حسب نوع الصفحة: التجار أو العملاء
+    .filter(order => (isMerchants ? order.source === 'merchant' : isCustomers ? order.source === 'customer' : true))
+    .filter(order => {
     const matchesSearch = order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          order.customerPhone.includes(searchTerm);
@@ -372,7 +425,7 @@ export default function OrdersManagement() {
     switch (currentStatus) {
       case "قيد المراجعة":
         return [
-          { value: "تم الموافقة وجاري البحث عن موصل", label: "موافقة وإتاحة للموصّلين", icon: <Users className="h-4 w-4" /> },
+          { value: "تم الموافقة وجاري البحث عن موصل", label: isMerchants ? "موافقة وإتاحة للمندوبين" : "موافقة وإتاحة للموصّلين", icon: <Users className="h-4 w-4" /> },
           { value: "ملغي", label: "إلغاء الطلب", icon: <XCircle className="h-4 w-4" /> }
         ];
       case "تم الموافقة وجاري البحث عن موصل":
@@ -387,8 +440,8 @@ export default function OrdersManagement() {
 
   const stats = [
     { 
-      title: "إجمالي الطلبات", 
-      value: orders.length, 
+      title: isMerchants ? "إجمالي طلبات التجار" : isCustomers ? "إجمالي طلبات العملاء" : "إجمالي الطلبات", 
+      value: filteredOrders.length, 
       change: "+12%", 
       icon: ShoppingCart, 
       color: "bg-gradient-to-br from-blue-500 to-blue-600",
@@ -403,7 +456,7 @@ export default function OrdersManagement() {
       bgColor: "bg-gray-50"
     },
     { 
-      title: "متاحة للموصّلين", 
+      title: isMerchants ? "متاحة للمندوبين" : "متاحة للموصّلين", 
       value: orders.filter(o => o.status === "تم الموافقة وجاري البحث عن موصل").length, 
       change: "+5%", 
       icon: Users, 
@@ -434,8 +487,12 @@ export default function OrdersManagement() {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة الطلبات</h1>
-            <p className="text-gray-600">إدارة جميع الطلبات وحالات التوصيل</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {isMerchants ? "طلبات التجار" : isCustomers ? "طلبات العملاء" : "إدارة الطلبات"}
+            </h1>
+            <p className="text-gray-600">
+              {isMerchants ? "إدارة طلبات أصحاب المتاجر وكباتن التوصيل" : isCustomers ? "إدارة طلبات العملاء العاديين" : "إدارة جميع الطلبات وحالات التوصيل"}
+            </p>
           </div>
           <button className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" />
@@ -474,7 +531,7 @@ export default function OrdersManagement() {
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="البحث في الطلبات..."
+                placeholder={isMerchants ? "بحث في طلبات التجار..." : isCustomers ? "بحث في طلبات العملاء..." : "البحث في الطلبات..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pr-10 pl-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -608,7 +665,7 @@ export default function OrdersManagement() {
                       >
                         <Eye size={16} />
                       </button>
-                      {permissions.canUpdateOrderStatus && canUpdateStatus(order) && (
+                      {permissions.can_update_order_status && canUpdateStatus(order) && (
                         <button 
                           className="text-green-600 hover:text-green-900"
                           onClick={() => {
@@ -620,7 +677,7 @@ export default function OrdersManagement() {
                           <Edit size={16} />
                         </button>
                       )}
-                      {permissions.canAssignDeliverer && canAssignDriver(order) && (
+                      {permissions.can_modify_employees && canAssignDriver(order) && (
                         <button 
                           className="text-purple-600 hover:text-purple-900"
                           onClick={() => {
@@ -920,7 +977,7 @@ export default function OrdersManagement() {
                 </h4>
                 <div className="space-y-3">
                   {selectedOrder.items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center bg-white rounded-lg p-3">
+                    <div key={`${selectedOrder.id}-item-${index}`} className="flex justify-between items-center bg-white rounded-lg p-3">
                       <div className="flex items-center">
                         <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center ml-3">
                           <span className="text-blue-600 font-medium text-sm">{index + 1}</span>

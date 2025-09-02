@@ -39,6 +39,10 @@ const calculatePermissions = (role: 'admin' | 'employee', customPermissions?: Pa
     can_update_order_status: true,
     can_view_live_map: true,
     
+  // صلاحيات المخزون
+  can_view_inventory: true,
+  can_modify_inventory: true,
+    
     // صلاحيات إدارة المستخدمين
     can_view_users: true,
     can_modify_users: true,
@@ -47,11 +51,9 @@ const calculatePermissions = (role: 'admin' | 'employee', customPermissions?: Pa
     can_view_employees: true,
     can_modify_employees: true,
     
-    // صلاحيات إدارة المنتجات والمخزون
+    // صلاحيات إدارة المنتجات
     can_view_products: true,
     can_add_products: true,
-    can_view_inventory: true,
-    can_modify_inventory: true,
     
     // صلاحيات التقارير والمراقبة
     can_view_reports: true,
@@ -70,6 +72,10 @@ const calculatePermissions = (role: 'admin' | 'employee', customPermissions?: Pa
     can_update_order_status: true,
     can_view_live_map: true,
     
+  // صلاحيات المخزون
+  can_view_inventory: true,
+  can_modify_inventory: false,
+    
     // صلاحيات إدارة المستخدمين
     can_view_users: true,
     can_modify_users: false,
@@ -78,11 +84,9 @@ const calculatePermissions = (role: 'admin' | 'employee', customPermissions?: Pa
     can_view_employees: true,
     can_modify_employees: false,
     
-    // صلاحيات إدارة المنتجات والمخزون
+    // صلاحيات إدارة المنتجات
     can_view_products: true,
     can_add_products: false,
-    can_view_inventory: true,
-    can_modify_inventory: false,
     
     // صلاحيات التقارير والمراقبة
     can_view_reports: true,
@@ -113,6 +117,10 @@ const giveAdminAllPermissions = (): Permissions => {
     can_update_order_status: true,
     can_view_live_map: true,
     
+  // صلاحيات المخزون
+  can_view_inventory: true,
+  can_modify_inventory: true,
+    
     // صلاحيات إدارة المستخدمين
     can_view_users: true,
     can_modify_users: true,
@@ -121,11 +129,9 @@ const giveAdminAllPermissions = (): Permissions => {
     can_view_employees: true,
     can_modify_employees: true,
     
-    // صلاحيات إدارة المنتجات والمخزون
+    // صلاحيات إدارة المنتجات
     can_view_products: true,
     can_add_products: true,
-    can_view_inventory: true,
-    can_modify_inventory: true,
     
     // صلاحيات التقارير والمراقبة
     can_view_reports: true,
@@ -154,6 +160,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     can_update_order_status: false,
     can_view_live_map: false,
     
+  // صلاحيات المخزون
+  can_view_inventory: false,
+  can_modify_inventory: false,
+    
     // صلاحيات إدارة المستخدمين
     can_view_users: false,
     can_modify_users: false,
@@ -162,11 +172,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     can_view_employees: false,
     can_modify_employees: false,
     
-    // صلاحيات إدارة المنتجات والمخزون
+    // صلاحيات إدارة المنتجات
     can_view_products: false,
     can_add_products: false,
-    can_view_inventory: false,
-    can_modify_inventory: false,
     
     // صلاحيات التقارير والمراقبة
     can_view_reports: false,
@@ -260,6 +268,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       can_update_order_status: false,
       can_view_live_map: false,
       
+  // صلاحيات المخزون
+  can_view_inventory: false,
+  can_modify_inventory: false,
+      
       // صلاحيات إدارة المستخدمين
       can_view_users: false,
       can_modify_users: false,
@@ -268,11 +280,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       can_view_employees: false,
       can_modify_employees: false,
       
-      // صلاحيات إدارة المنتجات والمخزون
+      // صلاحيات إدارة المنتجات
       can_view_products: false,
       can_add_products: false,
-      can_view_inventory: false,
-      can_modify_inventory: false,
       
       // صلاحيات التقارير والمراقبة
       can_view_reports: false,

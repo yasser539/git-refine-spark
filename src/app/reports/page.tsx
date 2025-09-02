@@ -6,17 +6,13 @@ import { useAuth } from "../context/AuthContext";
 import { 
   BarChart3, 
   TrendingUp, 
-  TrendingDown, 
   Download,
-  Calendar,
   DollarSign,
   ShoppingCart,
   Users,
   Package,
   Truck,
   Eye,
-  FileText,
-  PieChart,
   Activity,
   Shield
 } from "lucide-react";
@@ -119,7 +115,7 @@ export default function Reports() {
               <option value="quarter">الربع الحالي</option>
               <option value="year">السنة الحالية</option>
             </select>
-            {permissions.canExportReports ? (
+            {permissions.can_export_reports ? (
               <button className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2">
                 <Download className="h-4 w-4" />
                 تصدير التقرير
@@ -221,7 +217,7 @@ export default function Reports() {
                     <button className="text-blue-600 hover:text-blue-900 text-sm font-medium">
                       <Eye size={16} />
                     </button>
-                    {permissions.canExportReports && (
+                    {permissions.can_export_reports && (
                       <button className="text-green-600 hover:text-green-900 text-sm font-medium">
                         <Download size={16} />
                       </button>
@@ -237,7 +233,7 @@ export default function Reports() {
       {/* Quick Actions */}
       <div className="mt-8 bg-white rounded-xl shadow-lg border border-gray-100 p-6">
         <h3 className="text-lg font-bold text-gray-900 mb-4">إجراءات سريعة</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-lg transition-all duration-200">
             <BarChart3 className="h-5 w-5" />
             تقرير مبيعات
@@ -245,14 +241,6 @@ export default function Reports() {
           <button className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-all duration-200">
             <Truck className="h-5 w-5" />
             تقرير توصيل
-          </button>
-          <button className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-200">
-            <Users className="h-5 w-5" />
-            تقرير عملاء
-          </button>
-          <button className="flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-lg hover:shadow-lg transition-all duration-200">
-            <Package className="h-5 w-5" />
-            تقرير مخزون
           </button>
         </div>
       </div>

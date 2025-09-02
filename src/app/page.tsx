@@ -30,7 +30,7 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
-  const { user, permissions } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalOrders: 0,
     totalRevenue: 0,
@@ -76,13 +76,13 @@ export default function Dashboard() {
 
       // حساب الإحصائيات
       const totalOrders = ordersData.length;
-      const totalRevenue = ordersData.reduce((sum: number, order: any) => sum + (order.total_amount || 0), 0);
+      const totalRevenue = ordersData.reduce((sum: number, order: Record<string, unknown>) => sum + ((order.total_amount as number) || 0), 0);
       const totalCustomers = customersData.length;
       const totalDrivers = driversData.length;
-      const activeOrders = ordersData.filter((order: any) => 
-        order.status === 'pending' || order.status === 'delivering'
+      const activeOrders = ordersData.filter((order: Record<string, unknown>) => 
+        order.status === 'pending' || order.status === 'out_for_delivery'
       ).length;
-      const completedOrders = ordersData.filter((order: any) => 
+      const completedOrders = ordersData.filter((order: Record<string, unknown>) => 
         order.status === 'delivered'
       ).length;
 
@@ -104,7 +104,17 @@ export default function Dashboard() {
       });
 
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      const err = error as any;
+      console.error('Error fetching dashboard stats:', {
+        message: err?.message,
+        name: err?.name,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        status: err?.status,
+        error: err,
+        asString: typeof err === 'object' ? JSON.stringify(err) : String(err)
+      });
       setError('فشل في جلب إحصائيات لوحة التحكم');
     } finally {
       setLoading(false);

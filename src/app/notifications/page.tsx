@@ -3,112 +3,88 @@
 import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../context/AuthContext";
+import { adsService, notificationsService } from "../../lib/supabase-services";
 import { supabase } from "../../lib/supabase";
-import { adsService, notificationsService, slogansService } from "../../lib/supabase-services";
 import { 
   Bell, 
   Megaphone, 
-  AlertTriangle, 
   Plus, 
   Edit, 
   Trash2, 
-  Eye, 
-  EyeOff,
-  Upload,
-  Calendar,
-  Users,
-  Target,
-  BarChart3,
   RefreshCw,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Star,
-  X,
   Image as ImageIcon,
-  Type
+  X,
+  Loader2
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import type { Ad, Notification, Slogan } from "../../lib/supabase";
 
-interface NotificationStats {
-  totalAds: number;
-  totalNotifications: number;
-  totalSlogans: number;
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  target_user_id?: string;
+  target_role?: 'admin' | 'employee' | 'all';
+  is_read: boolean;
+  created_at: string;
+}
+
+interface Ad {
+  id: string;
+  image_url: string;
+  storage_bucket: string;
+  storage_path?: string;
+  created_at: string;
 }
 
 export default function NotificationsPage() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'ads' | 'notifications' | 'slogans'>('ads');
+  const { permissions } = useAuth();
+  const [activeTab, setActiveTab] = useState<'ads' | 'notifications'>('ads');
+  
   const [ads, setAds] = useState<Ad[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [slogans, setSlogans] = useState<Slogan[]>([]);
-  const [stats, setStats] = useState<NotificationStats>({
-    totalAds: 0,
-    totalNotifications: 0,
-    totalSlogans: 0
-  });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<Ad | Notification | Slogan | null>(null);
-  const [modalType, setModalType] = useState<'ad' | 'notification' | 'slogan'>('ad');
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
-  const [formData, setFormData] = useState({
-    title: '',
-    message: '',
-    slogan_text: ''
-  });
-  const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // دالة للحصول على رابط الصورة العامة
-  const getImageUrl = (ad: Ad) => {
-    // إذا كان الرابط يبدأ بـ http، فهو رابط مباشر
-    if (ad.image_url.startsWith('http')) {
-      return ad.image_url;
-    }
-    // إذا كان مسار فقط، احصل على الرابط العام
-    return adsService.getPublicUrl(ad.image_url);
-  };
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [newItem, setNewItem] = useState({
+    message: ""
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const [stats, setStats] = useState({
+    totalAds: 0,
+    totalNotifications: 0
+  });
 
   // جلب البيانات
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-
       console.log('🔍 Starting to fetch notifications data...');
 
-      // جلب البيانات من قاعدة البيانات
-      const [adsData, notificationsData, slogansData] = await Promise.all([
+      const [adsData, notificationsData] = await Promise.all([
         adsService.getAllAds(),
-        notificationsService.getAllNotifications(),
-        slogansService.getAllSlogans()
+        notificationsService.getAllNotifications()
       ]);
 
       setAds(adsData);
       setNotifications(notificationsData);
-      setSlogans(slogansData);
 
-      // حساب الإحصائيات
       setStats({
         totalAds: adsData.length,
-        totalNotifications: notificationsData.length,
-        totalSlogans: slogansData.length
+        totalNotifications: notificationsData.length
       });
 
-      console.log('📈 Stats calculated:', {
-        totalAds: adsData.length,
-        totalNotifications: notificationsData.length,
-        totalSlogans: slogansData.length
-      });
-
-    } catch (error: unknown) {
-      console.error('❌ Error in fetchData:', error);
-      setError('فشل في جلب بيانات الإعلانات والتنبيهات');
+      console.log('✅ Data fetched successfully:', { ads: adsData.length, notifications: notificationsData.length });
+    } catch (error) {
+      console.error('❌ Error fetching data:', error);
+      setError('فشل في جلب البيانات');
     } finally {
       setLoading(false);
     }
@@ -118,183 +94,154 @@ export default function NotificationsPage() {
     fetchData();
   }, []);
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      message: '',
-      slogan_text: ''
-    });
-    setSelectedImage(null);
-    setImagePreview('');
-    setModalType('ad');
-  };
-
-  const handleCreateItem = async () => {
+  // إضافة عنصر جديد
+  const handleAddNotification = async () => {
     try {
-      setIsCreating(true);
-      setError(null);
-
-      if (modalType === 'ad') {
-        let imagePath = 'ads/sample-ad-1.jpg'; // مسار افتراضي
-        let storagePath = null;
-        let publicUrl = null;
-
-        // إذا تم اختيار صورة جديدة، ارفعها إلى Storage
-        if (selectedImage) {
-          console.log('📤 رفع الصورة إلى Storage...');
-          
-          // التحقق من نوع الملف
-          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-          if (!allowedTypes.includes(selectedImage.type)) {
-            throw new Error('نوع الملف غير مدعوم. يرجى اختيار صورة (JPG, PNG, GIF, WebP)');
-          }
-          
-          // التحقق من حجم الملف (5MB كحد أقصى)
-          const maxSize = 5 * 1024 * 1024; // 5MB
-          if (selectedImage.size > maxSize) {
-            throw new Error('حجم الملف كبير جداً. الحد الأقصى 5MB');
-          }
-          
-          // تنظيف اسم الملف - إزالة المسافات والأحرف الخاصة
-          const cleanFileName = selectedImage.name
-            .replace(/[^a-zA-Z0-9.-]/g, '_') // استبدال الأحرف الخاصة بـ _
-            .replace(/\s+/g, '_') // استبدال المسافات بـ _
-            .toLowerCase(); // تحويل إلى أحرف صغيرة
-          
-          const fileName = `${Date.now()}-${cleanFileName}`;
-          console.log('📝 اسم الملف النظيف:', fileName);
-          
-          const uploadResult = await adsService.uploadAdImage(selectedImage, fileName);
-          
-          if (uploadResult && uploadResult.success) {
-            imagePath = uploadResult.path;
-            storagePath = uploadResult.path;
-            publicUrl = uploadResult.publicUrl;
-            console.log('✅ تم رفع الصورة بنجاح:', imagePath);
-          } else {
-            throw new Error('فشل في رفع الصورة');
-          }
-        }
-
-        console.log('📝 إنشاء الإعلان في قاعدة البيانات...');
-        // إنشاء إعلان جديد - تخزين الرابط العام المباشر
-        const newAd = await adsService.createAd({
-          image_url: publicUrl || imagePath, // استخدام الرابط العام المباشر
-          storage_path: storagePath
-        });
-
-        if (newAd) {
-          setAds(prevAds => [newAd, ...prevAds]);
-          setStats(prev => ({
-            ...prev,
-            totalAds: prev.totalAds + 1
-          }));
-          console.log('✅ تم إنشاء الإعلان بنجاح:', newAd);
-        } else {
-          throw new Error('فشل في إنشاء الإعلان');
-        }
-
-      } else if (modalType === 'notification') {
-        console.log('📝 إنشاء التنبيه...');
-        // إنشاء تنبيه جديد
+      if (activeTab === 'notifications') {
         const newNotification = await notificationsService.createNotification({
-          message: formData.message
+          title: newItem.message // Use message as the title if only message is provided
         });
-
         if (newNotification) {
-          setNotifications(prevNotifications => [newNotification, ...prevNotifications]);
-          setStats(prev => ({
-            ...prev,
-            totalNotifications: prev.totalNotifications + 1
-          }));
-          console.log('✅ تم إنشاء التنبيه بنجاح:', newNotification);
-        } else {
-          throw new Error('فشل في إنشاء التنبيه');
+          setNotifications([newNotification, ...notifications]);
+          setSuccessMessage('تم إضافة التنبيه بنجاح');
+        }
+      } else if (activeTab === 'ads') {
+        // التحقق من وجود صورة
+        if (!selectedFile) {
+          setError('يرجى اختيار صورة للإعلان');
+          return;
         }
 
-      } else if (modalType === 'slogan') {
-        console.log('📝 إنشاء الشعار...');
-        // إنشاء شعار جديد
-        const newSlogan = await slogansService.createSlogan({
-          title: formData.title,
-          slogan_text: formData.slogan_text
-        });
+        // رفع الصورة إلى Storage
+        const uploadResult = await uploadImageToStorage(selectedFile);
+        if (!uploadResult) {
+          setError('فشل في رفع الصورة');
+          return;
+        }
 
-        if (newSlogan) {
-          setSlogans(prevSlogans => [newSlogan, ...prevSlogans]);
-          setStats(prev => ({
-            ...prev,
-            totalSlogans: prev.totalSlogans + 1
-          }));
-          console.log('✅ تم إنشاء الشعار بنجاح:', newSlogan);
-        } else {
-          throw new Error('فشل في إنشاء الشعار');
+        // إنشاء إعلان جديد
+        const newAd = await adsService.createAd({
+          image_url: uploadResult.url,
+          storage_bucket: 'img',
+          storage_path: uploadResult.path
+        });
+        
+        if (newAd) {
+          // التأكد من أن العنصر الجديد له id فريد
+          const adWithUniqueId = {
+            ...newAd,
+            id: newAd.id || `ad-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          };
+          setAds([adWithUniqueId, ...ads]);
+          setStats(prev => ({ ...prev, totalAds: prev.totalAds + 1 }));
+          setSuccessMessage('تم إضافة الإعلان بنجاح');
         }
       }
-
-      setShowCreateModal(false);
-      resetForm();
       
-      // إظهار رسالة نجاح
-      const successMsg = modalType === 'ad' ? 'تم إضافة الإعلان بنجاح!' :
-                        modalType === 'notification' ? 'تم إضافة التنبيه بنجاح!' :
-                        'تم إضافة الشعار بنجاح!';
-      setSuccessMessage(successMsg);
+      setShowAddModal(false);
+  setNewItem({ message: "" });
       
-      // إخفاء رسالة النجاح بعد 3 ثوان
       setTimeout(() => setSuccessMessage(null), 3000);
-
     } catch (error) {
-      console.error('❌ Error creating item:', error);
-      setError(`فشل في إنشاء العنصر: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
-    } finally {
-      setIsCreating(false);
+      console.error('Error adding item:', error);
+      setError(`فشل في إضافة ${activeTab === 'notifications' ? 'التنبيه' : 'الإعلان'}`);
     }
   };
 
-  const handleDelete = async (item: Ad | Notification | Slogan) => {
-    if (!confirm('هل أنت متأكد من حذف هذا العنصر؟')) return;
-
+  // حذف عنصر
+  const handleDelete = async (item: any) => {
     try {
-      if ('image_url' in item) {
-        // حذف إعلان
-        await adsService.deleteAd(item.id);
-        
-        // حذف الصورة من Storage إذا كانت موجودة
-        if (item.storage_path) {
-          await adsService.deleteAdImage(item.storage_path);
-        }
-        
-        setAds(prevAds => prevAds.filter(ad => ad.id !== item.id));
-        setStats(prev => ({ ...prev, totalAds: prev.totalAds - 1 }));
-      } else if ('slogan_text' in item) {
-        // حذف شعار
-        await slogansService.deleteSlogan(item.id);
-        setSlogans(prevSlogans => prevSlogans.filter(slogan => slogan.id !== item.id));
-        setStats(prev => ({ ...prev, totalSlogans: prev.totalSlogans - 1 }));
-      } else {
-        // حذف تنبيه
+      if (activeTab === 'notifications') {
         await notificationsService.deleteNotification(item.id);
-        setNotifications(prevNotifications => prevNotifications.filter(notification => notification.id !== item.id));
+        setNotifications(notifications.filter(n => n.id !== item.id));
         setStats(prev => ({ ...prev, totalNotifications: prev.totalNotifications - 1 }));
+      } else if (activeTab === 'ads') {
+        await adsService.deleteAd(item.id);
+        setAds(ads.filter(a => a.id !== item.id));
+        setStats(prev => ({ ...prev, totalAds: prev.totalAds - 1 }));
       }
-
+      
+      setSuccessMessage('تم الحذف بنجاح');
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error deleting item:', error);
-      setError('فشل في حذف العنصر');
+      setError('فشل في الحذف');
     }
   };
 
-  if (error) {
+  // تحديث البيانات
+  const handleRefresh = () => {
+    fetchData();
+    setSuccessMessage('تم تحديث البيانات');
+    setTimeout(() => setSuccessMessage(null), 2000);
+  };
+
+  // معاينة الصورة المحددة
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+  // لا يوجد حقل title بعد الآن
+    
+    // إنشاء URL للمعاينة
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+  };
+
+  // رفع الصورة إلى Supabase Storage
+  const uploadImageToStorage = async (file: File): Promise<{ url: string; path: string } | null> => {
+    try {
+      // تنظيف اسم الملف للتأكد من أنه صالح لـ Supabase Storage
+      const cleanFileName = file.name
+        .replace(/[^a-zA-Z0-9.-]/g, '_') // استبدال الأحرف غير الصالحة بـ _
+        .replace(/\s+/g, '_') // استبدال المسافات بـ _
+        .replace(/_{2,}/g, '_') // إزالة _ المتكررة
+        .toLowerCase(); // تحويل إلى أحرف صغيرة
+      
+      const fileName = `${Date.now()}-${cleanFileName}`;
+      const filePath = `ads/${fileName}`;
+      
+      console.log('📤 رفع الملف:', { originalName: file.name, cleanName: cleanFileName, path: filePath });
+      
+      // رفع الملف إلى Supabase Storage - استخدام bucket 'img' الموجود
+      const { data, error } = await supabase.storage
+        .from('img')
+        .upload(filePath, file);
+      
+      if (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
+      
+      // الحصول على الرابط العام
+      const { data: urlData } = supabase.storage
+        .from('img')
+        .getPublicUrl(filePath);
+      
+      return {
+        url: urlData.publicUrl,
+        path: filePath
+      };
+    } catch (error) {
+      console.error('Error in uploadImageToStorage:', error);
+      return null;
+    }
+  };
+
+  // تنظيف المعاينة عند إغلاق Modal
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+  setNewItem({ message: "" });
+  };
+
+  if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12">
-          <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">خطأ في تحميل البيانات</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={fetchData} className="bg-blue-500 text-white">
-            إعادة المحاولة
-          </Button>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>جاري التحميل...</span>
+          </div>
         </div>
       </Layout>
     );
@@ -302,561 +249,334 @@ export default function NotificationsPage() {
 
   return (
     <Layout>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">الإعلانات والتنبيهات</h1>
-            <p className="text-gray-600">إدارة الإعلانات والتنبيهات والشعارات</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={fetchData}
-              disabled={loading}
-              className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'جاري التحديث...' : 'تحديث'}
-            </Button>
-            <Button 
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-500 text-white hover:bg-blue-600"
-            >
-              <Plus className="h-4 w-4 ml-2" />
-              إضافة جديد
-            </Button>
-          </div>
-        </div>
-
-        {/* رسائل النجاح والخطأ */}
-        {successMessage && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center">
-              <CheckCircle className="h-5 w-5 text-green-600 ml-2" />
-              <span className="text-green-800">{successMessage}</span>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center">
-              <XCircle className="h-5 w-5 text-red-600 ml-2" />
-              <span className="text-red-800">{error}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600 mb-1">إجمالي الإعلانات</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.totalAds}</p>
-                <p className="text-sm text-blue-600">إعلان</p>
-              </div>
-              <div className="p-3 rounded-xl bg-blue-500">
-                <Megaphone className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600 mb-1">إجمالي التنبيهات</p>
-                <p className="text-2xl font-bold text-orange-900">{stats.totalNotifications}</p>
-                <p className="text-sm text-orange-600">تنبيه</p>
-              </div>
-              <div className="p-3 rounded-xl bg-orange-500">
-                <Bell className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600 mb-1">إجمالي الشعارات</p>
-                <p className="text-2xl font-bold text-purple-900">{stats.totalSlogans}</p>
-                <p className="text-sm text-purple-600">شعار</p>
-              </div>
-              <div className="p-3 rounded-xl bg-purple-500">
-                <Type className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">إدارة الإعلانات والتنبيهات</h1>
+          <div className="flex items-center space-x-4 space-x-reverse">
             <button
-              onClick={() => setActiveTab('ads')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'ads'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2 space-x-reverse"
             >
-              <Megaphone className="h-4 w-4 ml-2 inline" />
-              الإعلانات ({ads.length})
+              <RefreshCw className="h-4 w-4" />
+              <span>تحديث</span>
             </button>
             <button
-              onClick={() => setActiveTab('notifications')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'notifications'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+              onClick={() => setShowAddModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 space-x-reverse"
             >
-              <Bell className="h-4 w-4 ml-2 inline" />
-              التنبيهات ({notifications.length})
+              <Plus className="h-4 w-4" />
+              <span>إضافة جديد</span>
             </button>
-            <button
-              onClick={() => setActiveTab('slogans')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'slogans'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <Type className="h-4 w-4 ml-2 inline" />
-              الشعارات ({slogans.length})
-            </button>
-          </nav>
+          </div>
         </div>
-      </div>
 
-      {/* Content */}
-      {activeTab === 'ads' && (
-        <div className="space-y-6">
-          {ads.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد إعلانات</h3>
-                <p className="text-gray-600 mb-4">ابدأ بإضافة إعلان جديد</p>
-                <Button onClick={() => setShowCreateModal(true)} className="bg-blue-500 text-white">
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة إعلان جديد
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {ads.map((ad) => (
-                <Card key={ad.id} className="hover:shadow-lg transition-shadow duration-300">
-                  <CardContent className="p-4">
-                    <div className="mb-4">
-                      <img 
-                        src={getImageUrl(ad)} 
-                        alt="إعلان"
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>تاريخ الإنشاء: {new Date(ad.created_at).toLocaleDateString('ar-SA')}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-0">
-                    <div className="flex items-center gap-2 w-full">
-                      <Button
-                        onClick={() => setEditingItem(ad)}
-                        className="flex-1 px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                        تعديل
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(ad)}
-                        className="px-3 py-1.5 text-xs border border-gray-300 bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">إجمالي التنبيهات</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalNotifications}</p>
+                <p className="text-sm text-gray-500">تنبيه</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Bell className="h-6 w-6 text-orange-600" />
+              </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
 
-      {activeTab === 'notifications' && (
-        <div className="space-y-6">
-          {notifications.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد تنبيهات</h3>
-                <p className="text-gray-600 mb-4">ابدأ بإضافة تنبيه جديد</p>
-                <Button onClick={() => setShowCreateModal(true)} className="bg-blue-500 text-white">
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة تنبيه جديد
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {notifications.map((notification) => (
-                <Card key={notification.id} className="hover:shadow-lg transition-shadow duration-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-blue-100">
-                          <Bell className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{notification.message}</CardTitle>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>تاريخ الإنشاء: {new Date(notification.created_at).toLocaleDateString('ar-SA')}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                          {notification.message.length}/30 حرف
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-0">
-                    <div className="flex items-center gap-2 w-full">
-                      <Button
-                        onClick={() => setEditingItem(notification)}
-                        className="flex-1 px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                        تعديل
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(notification)}
-                        className="px-3 py-1.5 text-xs border border-gray-300 bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">إجمالي الإعلانات</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalAds}</p>
+                <p className="text-sm text-gray-500">إعلان</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Megaphone className="h-6 w-6 text-blue-600" />
+              </div>
             </div>
-          )}
+          </div>
         </div>
-      )}
 
-      {activeTab === 'slogans' && (
-        <div className="space-y-6">
-          {slogans.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Type className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد شعارات</h3>
-                <p className="text-gray-600 mb-4">ابدأ بإضافة شعار جديد</p>
-                <Button onClick={() => setShowCreateModal(true)} className="bg-blue-500 text-white">
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة شعار جديد
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {slogans.map((slogan) => (
-                <Card key={slogan.id} className="hover:shadow-lg transition-shadow duration-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-purple-100">
-                          <Type className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{slogan.title}</CardTitle>
-                          <p className="text-sm text-gray-600 mt-1">{slogan.slogan_text}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-4">
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>تاريخ الإنشاء: {new Date(slogan.created_at).toLocaleDateString('ar-SA')}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                          {slogan.slogan_text.length}/120 حرف
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="pt-0">
-                    <div className="flex items-center gap-2 w-full">
-                      <Button
-                        onClick={() => setEditingItem(slogan)}
-                        className="flex-1 px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                      >
-                        <Edit className="h-4 w-4" />
-                        تعديل
-                      </Button>
-                      <Button
-                        onClick={() => handleDelete(slogan)}
-                        className="px-3 py-1.5 text-xs border border-gray-300 bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Create/Edit Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold">
-                {modalType === 'ad' ? 'إضافة إعلان جديد' : 
-                 modalType === 'notification' ? 'إضافة تنبيه جديد' : 'إضافة شعار جديد'}
-              </h3>
-              <Button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  resetForm();
-                }}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-8 space-x-reverse px-6">
+              <button
+                onClick={() => setActiveTab('ads')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 space-x-reverse ${
+                  activeTab === 'ads'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+                <Megaphone className="h-4 w-4" />
+                <span>الإعلانات ({ads.length})</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 space-x-reverse ${
+                  activeTab === 'notifications'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Bell className="h-4 w-4" />
+                <span>التنبيهات ({notifications.length})</span>
+              </button>
+            </nav>
+          </div>
 
-            {/* Type Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">نوع المحتوى</label>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => setModalType('ad')}
-                  className={`flex-1 ${modalType === 'ad' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  <Megaphone className="h-4 w-4 ml-2" />
-                  إعلان
-                </Button>
-                <Button
-                  onClick={() => setModalType('notification')}
-                  className={`flex-1 ${modalType === 'notification' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  <Bell className="h-4 w-4 ml-2" />
-                  تنبيه
-                </Button>
-                <Button
-                  onClick={() => setModalType('slogan')}
-                  className={`flex-1 ${modalType === 'slogan' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  <Type className="h-4 w-4 ml-2" />
-                  شعار
-                </Button>
+          {/* Content */}
+          <div className="p-6">
+            {/* Ads Tab */}
+            {activeTab === 'ads' && (
+              <div>
+                {ads.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد إعلانات</h3>
+                    <p className="text-gray-500">ابدأ بإضافة إعلان جديد</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {ads.map((ad, index) => (
+                      <div key={ad.id || `ad-${index}-${Date.now()}`} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                          {ad.image_url ? (
+                            <img
+                              src={ad.image_url}
+                              alt="صورة الإعلان"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // إذا فشل تحميل الصورة، اعرض الأيقونة
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          <ImageIcon className={`h-8 w-8 text-gray-400 ${ad.image_url ? 'hidden' : ''}`} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-500">
+                            {new Date(ad.created_at).toLocaleDateString('ar-SA')}
+                          </span>
+                          <div className="flex items-center space-x-2 space-x-reverse">
+                            <button
+                              onClick={() => handleDelete(ad)}
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedItem(ad);
+                                setShowEditModal(true);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Form */}
-            <div className="space-y-4">
-              {/* Image Upload for Ads */}
-              {modalType === 'ad' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">صورة الإعلان</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    {imagePreview ? (
-                      <div className="space-y-4">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="mx-auto max-h-48 rounded-lg"
-                        />
-                        <Button
-                          onClick={() => {
-                            setSelectedImage(null);
-                            setImagePreview('');
-                          }}
-                          className="px-3 py-1.5 text-xs border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                        >
-                          <X className="h-4 w-4 ml-1" />
-                          إزالة الصورة
-                        </Button>
+            {/* Notifications Tab */}
+            {activeTab === 'notifications' && (
+              <div>
+                {notifications.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد تنبيهات</h3>
+                    <p className="text-gray-500">ابدأ بإضافة تنبيه جديد</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {notifications.map((notification, index) => (
+                      <div key={notification.id || `notification-${index}-${Date.now()}`} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 space-x-reverse mb-2">
+                              <h3 className="font-medium text-gray-900">{notification.title}</h3>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                notification.type === 'success' ? 'bg-green-100 text-green-800' :
+                                notification.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                                notification.type === 'error' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {notification.type}
+                              </span>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-2">{notification.message}</p>
+                            <div className="flex items-center space-x-4 space-x-reverse text-xs text-gray-500">
+                              <span>المستهدف: {notification.target_role}</span>
+                              <span>تاريخ الإنشاء: {new Date(notification.created_at).toLocaleDateString('ar-SA')}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2 space-x-reverse">
+                            <button
+                              onClick={() => handleDelete(notification)}
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedItem(notification);
+                                setShowEditModal(true);
+                              }}
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Add Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">إضافة {activeTab === 'notifications' ? 'تنبيه' : 'إعلان'} جديد</h2>
+                <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              {activeTab === 'notifications' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">الرسالة</label>
+                    <textarea
+                      value={newItem.message}
+                      onChange={(e) => setNewItem({ ...newItem, message: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      rows={3}
+                      placeholder="أدخل رسالة التنبيه"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'ads' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">اختر صورة</label>
+                    {!selectedFile ? (
+                      <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                        <div className="space-y-1 text-center">
+                          <svg
+                            className="mx-auto h-12 w-12 text-gray-400"
+                            stroke="currentColor"
+                            fill="none"
+                            viewBox="0 0 48 48"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <div className="flex text-sm text-gray-600">
+                            <label
+                              htmlFor="file-upload"
+                              className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                            >
+                              <span>رفع صورة</span>
+                              <input
+                                id="file-upload"
+                                name="file-upload"
+                                type="file"
+                                className="sr-only"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleFileSelect(file);
+                                  }
+                                }}
+                              />
+                            </label>
+                            <p className="pl-1">أو اسحب وأفلت</p>
+                          </div>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF حتى 10MB</p>
+                        </div>
                       </div>
                     ) : (
-                      <div>
-                        <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <div className="space-y-2">
-                          <Button
-                            onClick={() => document.getElementById('image-upload')?.click()}
-                            className="bg-blue-500 text-white hover:bg-blue-600"
+                      <div className="mt-1">
+                        <div className="relative">
+                          <img
+                            src={previewUrl || ''}
+                            alt="معاينة الصورة"
+                            className="w-full h-32 object-cover rounded-lg border border-gray-300"
+                          />
+                          <button
+                            onClick={() => {
+                              setSelectedFile(null);
+                              setPreviewUrl(null);
+                              setNewItem({ message: "" });
+                            }}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                           >
-                            <Upload className="h-4 w-4 ml-2" />
-                            اختيار صورة
-                          </Button>
-                          <p className="text-sm text-gray-500">PNG, JPG حتى 5MB</p>
+                            <X className="h-4 w-4" />
+                          </button>
                         </div>
+                        <p className="text-sm text-gray-600 mt-2">تم اختيار: {selectedFile.name}</p>
                       </div>
                     )}
-                    <input
-                      id="image-upload"
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          // التحقق من نوع الملف
-                          const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                          if (!allowedTypes.includes(file.type)) {
-                            setError('نوع الملف غير مدعوم. يرجى اختيار صورة (JPG, PNG, GIF, WebP)');
-                            return;
-                          }
-                          
-                          // التحقق من حجم الملف (5MB كحد أقصى)
-                          const maxSize = 5 * 1024 * 1024; // 5MB
-                          if (file.size > maxSize) {
-                            setError('حجم الملف كبير جداً. الحد الأقصى 5MB');
-                            return;
-                          }
-                          
-                          setSelectedImage(file);
-                          setError(null); // مسح أي أخطاء سابقة
-                          const reader = new FileReader();
-                          reader.onload = (e) => {
-                            setImagePreview(e.target?.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                    />
                   </div>
+
                 </div>
               )}
-
-              {/* Message for Notifications */}
-              {modalType === 'notification' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    رسالة التنبيه <span className="text-red-500">*</span>
-                    <span className="text-xs text-gray-500 mr-2">(30 حرف كحد أقصى)</span>
-                  </label>
-                  <textarea
-                    value={formData.message}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value.length <= 30) {
-                        setFormData({...formData, message: value});
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="أدخل رسالة التنبيه (30 حرف كحد أقصى)"
-                    maxLength={30}
-                  />
-                  <div className="text-xs text-gray-500 mt-1">
-                    {formData.message.length}/30 حرف
-                  </div>
-                </div>
-              )}
-
-              {/* Title and Slogan Text for Slogans */}
-              {modalType === 'slogan' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      عنوان الشعار <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => setFormData({...formData, title: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="أدخل عنوان الشعار"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      نص الشعار <span className="text-red-500">*</span>
-                      <span className="text-xs text-gray-500 mr-2">(120 حرف كحد أقصى)</span>
-                    </label>
-                    <textarea
-                      value={formData.slogan_text}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value.length <= 120) {
-                          setFormData({...formData, slogan_text: value});
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      rows={4}
-                      placeholder="أدخل نص الشعار (120 حرف كحد أقصى)"
-                      maxLength={120}
-                    />
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formData.slogan_text.length}/120 حرف
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 mt-6">
-              <Button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  resetForm();
-                }}
-                className="flex-1 px-3 py-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleCreateItem}
-                disabled={
-                  isCreating ||
-                  (modalType === 'notification' && !formData.message) ||
-                  (modalType === 'slogan' && (!formData.title || !formData.slogan_text))
-                }
-                className="flex-1 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
-              >
-                {isCreating ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white ml-2"></div>
-                    جاري الإضافة...
-                  </>
-                ) : (
-                  <>
-                    {modalType === 'ad' ? 'إضافة الإعلان' : 
-                     modalType === 'notification' ? 'إضافة التنبيه' : 'إضافة الشعار'}
-                  </>
-                )}
-              </Button>
+              
+              <div className="flex items-center justify-end space-x-3 space-x-reverse mt-6">
+                <button
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handleAddNotification}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  إضافة
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Success/Error Messages */}
+        {successMessage && (
+          <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+            {successMessage}
+          </div>
+        )}
+        
+        {error && (
+          <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+            {error}
+          </div>
+        )}
+      </div>
     </Layout>
   );
 }

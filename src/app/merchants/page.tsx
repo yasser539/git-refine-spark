@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
+import JSZip from "jszip";
 import { 
   Building, 
-  Plus, 
   Edit, 
   Trash2, 
   Eye, 
@@ -27,6 +27,8 @@ import {
   AlertCircle,
   FileImage
 } from "lucide-react";
+
+import { merchantsService, merchantDocumentsService, type MerchantDb } from "@/lib/supabase-services";
 
 interface Merchant {
   id: string;
@@ -56,80 +58,17 @@ interface Merchant {
 }
 
 export default function MerchantsManagement() {
-  const [merchants, setMerchants] = useState<Merchant[]>([
-    {
-      id: "1",
-      name: "شركة المياه الوطنية",
-      phone: "+966507654321",
-      email: "info@nationalwater.com",
-      status: "نشط",
-      createdAt: "2024-01-10",
-      lastLogin: "2024-01-19",
-      ordersCount: 45,
-      rating: 4.9,
-      location: "الرياض",
-      totalSpent: 8500,
-      commercialRecord: "4030000001",
-      nationalAddress: "الرياض، حي النزهة، شارع الملك فهد",
-      taxNumber: "300000000",
-      nationalId: "1012345678",
-      documents: {
-        commercialRecordDoc: "/documents/commercial-record-1.pdf",
-        nationalAddressDoc: "/documents/national-address-1.pdf",
-        taxNumberDoc: "/documents/tax-number-1.pdf",
-        nationalIdDoc: "/documents/national-id-1.jpg"
-      }
-    },
-    {
-      id: "2",
-      name: "مؤسسة المياه الجديدة",
-      phone: "+966501112223",
-      email: "contact@newwater.com",
-      status: "في انتظار الموافقة",
-      createdAt: "2024-01-01",
-      lastLogin: "2024-01-15",
-      ordersCount: 0,
-      rating: 0,
-      location: "جدة",
-      totalSpent: 0,
-      commercialRecord: "4030000002",
-      nationalAddress: "جدة، حي الكورنيش، شارع التحلية",
-      taxNumber: "300000001",
-      nationalId: "2012345678",
-      documents: {
-        commercialRecordDoc: "/documents/commercial-record-2.pdf",
-        nationalAddressDoc: "/documents/national-address-2.pdf",
-        taxNumberDoc: "/documents/tax-number-2.pdf",
-        nationalIdDoc: "/documents/national-id-2.jpg"
-      }
-    },
-    {
-      id: "3",
-      name: "شركة المياه المتميزة",
-      phone: "+966503334445",
-      email: "info@premiumwater.com",
-      status: "نشط",
-      createdAt: "2024-01-18",
-      lastLogin: "2024-01-21",
-      ordersCount: 28,
-      rating: 4.7,
-      location: "الدمام",
-      totalSpent: 4200,
-      commercialRecord: "4030000003",
-      nationalAddress: "الدمام، حي الشاطئ، شارع الملك خالد",
-      taxNumber: "300000002",
-      nationalId: "3012345678",
-      documents: {
-        commercialRecordDoc: "/documents/commercial-record-3.pdf",
-        nationalAddressDoc: "/documents/national-address-3.pdf",
-        taxNumberDoc: "/documents/tax-number-3.pdf",
-        nationalIdDoc: "/documents/national-id-3.jpg"
-      }
-    }
-  ]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [selectedMerchantDocs, setSelectedMerchantDocs] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<null | { type: 'success' | 'error' | 'info'; message: string }>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [merchantToApprove, setMerchantToApprove] = useState<Merchant | null>(null);
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("الكل");
@@ -153,6 +92,94 @@ export default function MerchantsManagement() {
     }
   });
 
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const downloadDocumentsAsZip = async (merchantName: string, documents: any[]) => {
+    if (documents.length === 0) {
+      showToast('error', 'لا توجد مستندات للتحميل');
+      return;
+    }
+
+    showToast('info', 'جاري تجهيز الملف للتحميل...');
+
+    try {
+      const zip = new JSZip();
+      let addedFiles = 0;
+      
+      // إضافة كل مستند إلى الملف المضغوط
+      for (const doc of documents) {
+        try {
+          // جلب الملف من الرابط
+          const response = await fetch(doc.file_path);
+          if (response.ok) {
+            const blob = await response.blob();
+            
+            // تحديد اسم الملف بناءً على نوع المستند
+            let fileName = '';
+            switch (doc.doc_type) {
+              case 'commercial_register':
+                fileName = 'السجل_التجاري';
+                break;
+              case 'national_address':
+                fileName = 'العنوان_الوطني';
+                break;
+              case 'tax_number':
+                fileName = 'الرقم_الضريبي';
+                break;
+              case 'national_id':
+                fileName = 'الهوية_الوطنية';
+                break;
+              default:
+                fileName = doc.doc_type;
+            }
+            
+            // إضافة امتداد الملف
+            const fileExtension = doc.mime_type?.includes('pdf') ? '.pdf' : '.jpg';
+            fileName += fileExtension;
+            
+            zip.file(fileName, blob);
+            addedFiles++;
+          }
+        } catch (error) {
+          console.error(`خطأ في جلب المستند ${doc.doc_type}:`, error);
+        }
+      }
+      
+      if (addedFiles === 0) {
+        showToast('error', 'لم يتم العثور على مستندات قابلة للتحميل');
+        return;
+      }
+      
+      // إنشاء وتحميل الملف المضغوط
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `مستندات_${merchantName}_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      showToast('success', `تم تحميل ${addedFiles} مستند بنجاح`);
+    } catch (error) {
+      console.error('خطأ في إنشاء الملف المضغوط:', error);
+      showToast('error', 'حدث خطأ أثناء تحميل المستندات');
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!newMerchant.name.trim()) errors.name = 'اسم الشركة مطلوب';
+    if (!newMerchant.phone.trim()) errors.phone = 'رقم الهاتف مطلوب';
+    if (!newMerchant.location.trim()) errors.location = 'الموقع مطلوب';
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const filteredMerchants = merchants.filter(merchant => {
     const matchesSearch = merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          merchant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -164,65 +191,185 @@ export default function MerchantsManagement() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleAddMerchant = () => {
-    const merchant: Merchant = {
-      id: Date.now().toString(),
-      name: newMerchant.name,
-      phone: newMerchant.phone,
-      email: newMerchant.email,
-      status: "في انتظار الموافقة",
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: "-",
-      ordersCount: 0,
-      rating: 0,
-      location: newMerchant.location,
-      totalSpent: 0,
-      commercialRecord: newMerchant.commercialRecord,
-      nationalAddress: newMerchant.nationalAddress,
-      taxNumber: newMerchant.taxNumber,
-      nationalId: newMerchant.nationalId,
-      documents: {}
-    };
-    
-    setMerchants([...merchants, merchant]);
-    setShowAddModal(false);
-    setNewMerchant({
-      name: "",
-      phone: "",
-      email: "",
-      location: "",
-      password: "",
-      commercialRecord: "",
-      nationalAddress: "",
-      taxNumber: "",
-      nationalId: "",
-      documents: {
-        commercialRecordDoc: null,
-        nationalAddressDoc: null,
-        taxNumberDoc: null,
-        nationalIdDoc: null
+  // خرائط حالة قاعدة البيانات <-> واجهة المستخدم
+  const mapStatusDbToUi = (status: MerchantDb['status']): Merchant['status'] => {
+    if (status === 'approved') return 'نشط';
+    if (status === 'rejected') return 'معطل';
+    return 'في انتظار الموافقة';
+  };
+
+  const mapStatusUiToDb = (status: Merchant['status']): MerchantDb['status'] => {
+    if (status === 'نشط') return 'approved';
+    if (status === 'معطل') return 'rejected';
+    return 'pending';
+  };
+
+  const dbToUiMerchant = (m: MerchantDb): Merchant => ({
+    id: m.merchant_id,
+    name: m.store_name,
+    phone: m.phone_display || m.phone_e164 || '',
+    email: '',
+    status: mapStatusDbToUi(m.status),
+    createdAt: (m.created_at || '').split('T')[0],
+    lastLogin: '-',
+    avatar: m.store_name?.charAt(0),
+    ordersCount: 0,
+    rating: 0,
+    location: m.address,
+    totalSpent: 0,
+    commercialRecord: '',
+    nationalAddress: '',
+    taxNumber: '',
+    nationalId: '',
+    documents: {}
+  });
+
+  const fetchMerchants = async () => {
+    try {
+      setLoading(true);
+      const data = await merchantsService.getAllMerchants();
+      setMerchants(data.map(dbToUiMerchant));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMerchants();
+  }, []);
+
+  const handleAddMerchant = async () => {
+    try {
+      if (!validateForm()) {
+        showToast('error', 'الرجاء تعبئة الحقول المطلوبة');
+        return;
       }
-    });
+      setIsSubmitting(true);
+      setLoading(true);
+      const created = await merchantsService.createMerchant({
+        store_name: newMerchant.name || 'N/A',
+        owner_name: 'غير محدد',
+        phone_display: newMerchant.phone || null,
+        phone_e164: newMerchant.phone || null,
+        address: newMerchant.location || 'N/A',
+        status: 'pending'
+      });
+      const ui = dbToUiMerchant(created);
+      setMerchants([ui, ...merchants]);
+
+      // رفع المستندات إن وُجدت
+      const docsUploads: Array<Promise<any>> = [];
+      const filesMap: Array<{ key: keyof typeof newMerchant.documents; type: 'commercial_register'|'national_address'|'tax_number'|'national_id' }>= [
+        { key: 'commercialRecordDoc', type: 'commercial_register' },
+        { key: 'nationalAddressDoc', type: 'national_address' },
+        { key: 'taxNumberDoc', type: 'tax_number' },
+        { key: 'nationalIdDoc', type: 'national_id' }
+      ];
+
+      filesMap.forEach(({ key, type }) => {
+        const file = newMerchant.documents[key];
+        if (file) {
+          docsUploads.push((async () => {
+            const uploaded = await merchantDocumentsService.uploadMerchantDoc(file, created.merchant_id);
+            await merchantDocumentsService.addDocument({
+              merchant_id: created.merchant_id,
+              doc_type: type,
+              file_name: file.name,
+              file_path: uploaded.path,
+              mime_type: file.type
+            });
+          })());
+        }
+      });
+      await Promise.all(docsUploads);
+      setShowAddModal(false);
+      showToast('success', 'تم إضافة التاجر ورفع المستندات بنجاح');
+    } catch (e) {
+      console.error(e);
+      showToast('error', 'فشل إضافة التاجر، حاول مرة أخرى');
+    } finally {
+      setLoading(false);
+      setIsSubmitting(false);
+      setNewMerchant({
+        name: "",
+        phone: "",
+        email: "",
+        location: "",
+        password: "",
+        commercialRecord: "",
+        nationalAddress: "",
+        taxNumber: "",
+        nationalId: "",
+        documents: {
+          commercialRecordDoc: null,
+          nationalAddressDoc: null,
+          taxNumberDoc: null,
+          nationalIdDoc: null
+        }
+      });
+    }
   };
 
-  const toggleMerchantStatus = (merchantId: string) => {
-    setMerchants(merchants.map(merchant => 
-      merchant.id === merchantId 
-        ? { ...merchant, status: merchant.status === "نشط" ? "معطل" : "نشط" }
-        : merchant
-    ));
+  const toggleMerchantStatus = async (merchantId: string) => {
+    const current = merchants.find(m => m.id === merchantId);
+    if (!current) return;
+    const nextUi: Merchant['status'] = current.status === 'نشط' ? 'معطل' : 'نشط';
+    try {
+      setMerchants(merchants.map(m => m.id === merchantId ? { ...m, status: nextUi } : m));
+      await merchantsService.updateMerchant(merchantId, { status: mapStatusUiToDb(nextUi) });
+    } catch (e) {
+      console.error(e);
+      // rollback
+      setMerchants(merchants.map(m => m.id === merchantId ? { ...m, status: current.status } : m));
+    }
   };
 
-  const approveMerchant = (merchantId: string) => {
-    setMerchants(merchants.map(merchant => 
-      merchant.id === merchantId 
-        ? { ...merchant, status: "نشط" }
-        : merchant
-    ));
+  const approveMerchant = async (merchantId: string) => {
+    const merchant = merchants.find(m => m.id === merchantId);
+    if (!merchant) return;
+    
+    setMerchantToApprove(merchant);
+    setShowApprovalModal(true);
   };
 
-  const deleteMerchant = (merchantId: string) => {
-    setMerchants(merchants.filter(merchant => merchant.id !== merchantId));
+  const confirmApproval = async () => {
+    if (!merchantToApprove) return;
+    
+    const prev = merchantToApprove.status;
+    try {
+      setMerchants(merchants.map(merchant => 
+        merchant.id === merchantToApprove.id 
+          ? { ...merchant, status: "نشط" }
+          : merchant
+      ));
+      await merchantsService.updateMerchant(merchantToApprove.id, { status: 'approved' });
+      showToast('success', `تم الموافقة على ${merchantToApprove.name} بنجاح`);
+      setShowApprovalModal(false);
+      setMerchantToApprove(null);
+    } catch (e) {
+      console.error(e);
+      if (prev) {
+        setMerchants(merchants.map(merchant => merchant.id === merchantToApprove.id ? { ...merchant, status: prev } : merchant));
+      }
+      showToast('error', 'تعذر الموافقة على التاجر');
+    }
+  };
+
+  const deleteMerchant = async (merchantId: string) => {
+    const prev = merchants;
+    try {
+      const confirmDelete = typeof window !== 'undefined' ? window.confirm('هل أنت متأكد من حذف هذا التاجر؟ لا يمكن التراجع.') : true;
+      if (!confirmDelete) return;
+      setMerchants(merchants.filter(merchant => merchant.id !== merchantId));
+      await merchantsService.deleteMerchant(merchantId);
+      showToast('success', 'تم حذف التاجر');
+    } catch (e) {
+      console.error(e);
+      setMerchants(prev);
+      showToast('error', 'تعذر حذف التاجر');
+    }
   };
 
   const handleFileUpload = (field: keyof typeof newMerchant.documents, file: File) => {
@@ -283,6 +430,11 @@ export default function MerchantsManagement() {
     <Layout>
       {/* Header */}
       <div className="mb-8">
+        {toast && (
+          <div className={`mb-4 rounded-lg p-3 text-sm ${toast.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : toast.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`}>
+            {toast.message}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">إدارة التجار</h1>
@@ -299,7 +451,8 @@ export default function MerchantsManagement() {
             </button>
             <button
               onClick={() => setShowAddModal(true)}
-              className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+              className="bg-gradient-to-r from-purple-500 to-pink-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-200 flex items-center gap-2 disabled:opacity-60"
+              disabled={isSubmitting}
             >
               <UserPlus className="h-4 w-4" />
               إضافة تاجر جديد
@@ -448,8 +601,15 @@ export default function MerchantsManagement() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2 space-x-reverse">
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedMerchant(merchant);
+                            try {
+                              const docs = await merchantDocumentsService.listDocuments(merchant.id);
+                              setSelectedMerchantDocs(docs || []);
+                            } catch (e) {
+                              console.error(e);
+                              setSelectedMerchantDocs([]);
+                            }
                             setShowDocumentModal(true);
                           }}
                           className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-100"
@@ -458,7 +618,7 @@ export default function MerchantsManagement() {
                           <FileText className="h-4 w-4" />
                         </button>
                         <span className="text-xs text-gray-500">
-                          {Object.keys(merchant.documents).length}/4
+                          {selectedMerchant?.id === merchant.id ? selectedMerchantDocs.length : 0}/4
                         </span>
                       </div>
                     </td>
@@ -607,9 +767,10 @@ export default function MerchantsManagement() {
                     type="text"
                     value={newMerchant.name}
                     onChange={(e) => setNewMerchant({...newMerchant, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${formErrors.name ? 'border-red-300' : 'border-gray-300'}`}
                     placeholder="أدخل اسم الشركة"
                   />
+                  {formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name}</p>}
                 </div>
                 
                 <div>
@@ -618,9 +779,10 @@ export default function MerchantsManagement() {
                     type="tel"
                     value={newMerchant.phone}
                     onChange={(e) => setNewMerchant({...newMerchant, phone: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${formErrors.phone ? 'border-red-300' : 'border-gray-300'}`}
                     placeholder="+966501234567"
                   />
+                  {formErrors.phone && <p className="text-xs text-red-600 mt-1">{formErrors.phone}</p>}
                 </div>
                 
                 <div>
@@ -640,52 +802,61 @@ export default function MerchantsManagement() {
                     type="text"
                     value={newMerchant.location}
                     onChange={(e) => setNewMerchant({...newMerchant, location: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent ${formErrors.location ? 'border-red-300' : 'border-gray-300'}`}
                     placeholder="الرياض، جدة، الدمام"
                   />
+                  {formErrors.location && <p className="text-xs text-red-600 mt-1">{formErrors.location}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">السجل التجاري</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">السجل التجاري (صورة أو PDF)</label>
                   <input
-                    type="text"
-                    value={newMerchant.commercialRecord}
-                    onChange={(e) => setNewMerchant({...newMerchant, commercialRecord: e.target.value})}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload('commercialRecordDoc', file);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="4030000001"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">العنوان الوطني</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">العنوان الوطني (صورة أو PDF)</label>
                   <input
-                    type="text"
-                    value={newMerchant.nationalAddress}
-                    onChange={(e) => setNewMerchant({...newMerchant, nationalAddress: e.target.value})}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload('nationalAddressDoc', file);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="الرياض، حي النزهة، شارع الملك فهد"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الرقم الضريبي</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">الرقم الضريبي (صورة أو PDF)</label>
                   <input
-                    type="text"
-                    value={newMerchant.taxNumber}
-                    onChange={(e) => setNewMerchant({...newMerchant, taxNumber: e.target.value})}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload('taxNumberDoc', file);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="300000000"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">الهوية الوطنية</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">الهوية الوطنية (صورة أو PDF)</label>
                   <input
-                    type="text"
-                    value={newMerchant.nationalId}
-                    onChange={(e) => setNewMerchant({...newMerchant, nationalId: e.target.value})}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload('nationalIdDoc', file);
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="1012345678"
                   />
                 </div>
 
@@ -710,9 +881,10 @@ export default function MerchantsManagement() {
                 </button>
                 <button
                   onClick={handleAddMerchant}
-                  className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:shadow-lg transition-colors"
+                  className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:shadow-lg transition-colors disabled:opacity-60"
+                  disabled={isSubmitting}
                 >
-                  إضافة التاجر
+                  {isSubmitting ? 'جارٍ الإضافة...' : 'إضافة التاجر'}
                 </button>
               </div>
             </div>
@@ -723,50 +895,76 @@ export default function MerchantsManagement() {
       {/* Documents Modal */}
       {showDocumentModal && selectedMerchant && (
         <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-xl bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-[450px] shadow-xl rounded-xl bg-white">
             <div className="mt-3">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">مستندات {selectedMerchant.name}</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">مستندات {selectedMerchant.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {selectedMerchantDocs.length} من 4 مستندات مرفوعة
+                  </p>
+                </div>
+                {selectedMerchantDocs.length > 0 && (
+                  <button
+                    onClick={() => downloadDocumentsAsZip(selectedMerchant.name, selectedMerchantDocs)}
+                    className="flex items-center space-x-2 space-x-reverse px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white text-sm rounded-lg hover:shadow-lg transition-colors"
+                    title="تحميل جميع المستندات كملف مضغوط"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>تحميل ZIP</span>
+                  </button>
+                )}
+              </div>
               
               <div className="space-y-4">
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">السجل التجاري</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{selectedMerchant.commercialRecord}</span>
-                    <button className="text-purple-600 hover:text-purple-900">
-                      <FileText className="h-4 w-4" />
-                    </button>
+                {selectedMerchantDocs.length === 0 && (
+                  <div className="text-sm text-gray-500 text-center py-4">لا توجد مستندات مرفوعة</div>
+                )}
+                {selectedMerchantDocs.map((doc) => (
+                  <div key={doc.id} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2 space-x-reverse">
+                        <div className={`w-3 h-3 rounded-full ${
+                          doc.doc_type === 'commercial_register' ? 'bg-blue-500' :
+                          doc.doc_type === 'national_address' ? 'bg-green-500' :
+                          doc.doc_type === 'tax_number' ? 'bg-yellow-500' :
+                          doc.doc_type === 'national_id' ? 'bg-purple-500' : 'bg-gray-500'
+                        }`}></div>
+                        <h4 className="font-medium text-gray-900">
+                          {doc.doc_type === 'commercial_register' && 'السجل التجاري'}
+                          {doc.doc_type === 'national_address' && 'العنوان الوطني'}
+                          {doc.doc_type === 'tax_number' && 'الرقم الضريبي'}
+                          {doc.doc_type === 'national_id' && 'الهوية الوطنية'}
+                        </h4>
+                      </div>
+                      <div className="flex items-center space-x-2 space-x-reverse">
+                        <a 
+                          className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-100 transition-colors" 
+                          href={doc.file_path || '#'} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          title="عرض المستند"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </a>
+                        <a 
+                          className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-100 transition-colors" 
+                          href={doc.file_path || '#'} 
+                          download
+                          title="تحميل المستند"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      {doc.file_name || doc.mime_type || 'مستند'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {doc.mime_type?.includes('pdf') ? 'PDF' : 'صورة'}
+                    </div>
                   </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">العنوان الوطني</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{selectedMerchant.nationalAddress}</span>
-                    <button className="text-purple-600 hover:text-purple-900">
-                      <FileText className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">الرقم الضريبي</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{selectedMerchant.taxNumber}</span>
-                    <button className="text-purple-600 hover:text-purple-900">
-                      <FileText className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">الهوية الوطنية</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">{selectedMerchant.nationalId}</span>
-                    <button className="text-purple-600 hover:text-purple-900">
-                      <FileImage className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+                ))}
               </div>
               
               <div className="flex justify-end mt-6">
@@ -775,6 +973,51 @@ export default function MerchantsManagement() {
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   إغلاق
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approval Confirmation Modal */}
+      {showApprovalModal && merchantToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-xl rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="text-center mb-6">
+                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  تأكيد الموافقة على التاجر
+                </h3>
+                <p className="text-sm text-gray-600">
+                  هل أنت متأكد من الموافقة على التاجر
+                </p>
+                <p className="text-lg font-semibold text-purple-600 mt-2">
+                  {merchantToApprove.name}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  سيتم تفعيل التاجر وإمكانية استقبال الطلبات
+                </p>
+              </div>
+              
+              <div className="flex justify-center space-x-3 space-x-reverse">
+                <button
+                  onClick={() => {
+                    setShowApprovalModal(false);
+                    setMerchantToApprove(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={confirmApproval}
+                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:shadow-lg transition-colors"
+                >
+                  تأكيد الموافقة
                 </button>
               </div>
             </div>

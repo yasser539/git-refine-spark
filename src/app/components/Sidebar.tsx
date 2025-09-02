@@ -1,21 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "../context/AuthContext";
 import { usePathname } from "next/navigation";
 import { 
   Users, 
   Package, 
   ShoppingCart, 
-  Warehouse, 
   Map, 
-  Settings, 
   BarChart3, 
   MessageSquare, 
   Activity,
   Home,
   Shield,
   UserCheck,
-  UserPlus,
   Building,
   LogOut,
   Bell
@@ -28,22 +26,25 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { logout } = useAuth();
   
   const menuItems = [
     // القسم الأول: العمليات الأساسية (الأولوية العالية)
     { name: "الرئيسية", icon: Home, href: "/", color: "text-blue-600", priority: 1 },
-    { name: "إدارة الطلبات", icon: ShoppingCart, href: "/orders", color: "text-violet-600", priority: 1 },
+    { name: "طلبات العملاء", icon: ShoppingCart, href: "/orders/customers", color: "text-violet-600", priority: 1 },
+    { name: "طلبات التجار", icon: Building, href: "/orders/merchants", color: "text-purple-600", priority: 1 },
     { name: "الخريطة الحية", icon: Map, href: "/live-map", color: "text-blue-600", priority: 1 },
     { name: "الإعلانات والإشعارات", icon: Bell, href: "/notifications", color: "text-orange-600", priority: 1 },
+
     
     // القسم الثاني: إدارة المستخدمين (الأولوية المتوسطة)
     { name: "إدارة العملاء", icon: Users, href: "/users", color: "text-indigo-600", priority: 2 },
     { name: "إدارة التجار", icon: Building, href: "/merchants", color: "text-purple-600", priority: 2 },
-    { name: "إدارة كباتن التوصيل", icon: UserCheck, href: "/employees", color: "text-purple-600", priority: 2 },
+    { name: "إدارة كباتن التوصيل", icon: UserCheck, href: "/delivery-captains", color: "text-purple-600", priority: 2 },
     
     // القسم الثالث: إدارة المنتجات والمخزون (الأولوية المتوسطة)
     { name: "إدارة عرض المنتجات", icon: Package, href: "/products", color: "text-pink-600", priority: 2 },
-    { name: "إدارة المخزون", icon: Warehouse, href: "/inventory", color: "text-cyan-600", priority: 2 },
+
     
     // القسم الرابع: المراقبة والتقارير (الأولوية المنخفضة)
     { name: "التقارير", icon: BarChart3, href: "/reports", color: "text-indigo-600", priority: 3 },
@@ -66,7 +67,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
       
       {/* Sidebar - Fixed on all screens, below header */}
-      <aside className={`fixed top-16 right-0 z-40 w-64 h-[calc(100vh-4rem)] bg-gradient-to-b from-blue-900 via-blue-800 to-indigo-900 shadow-xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0 lg:shadow-none scrollbar-thin`}>
+      <aside className={`fixed top-16 right-0 z-40 w-64 h-[calc(100vh-4rem)] bg-gradient-to-b from-indigo-900/95 via-indigo-800/95 to-blue-900/95 backdrop-blur-md shadow-xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0 lg:shadow-none scrollbar-thin rounded-l-2xl`}>
         <div className="flex flex-col h-full">
           {/* Navigation */}
           <div className="flex-1 flex flex-col pt-4 pb-4 overflow-y-auto">
@@ -107,7 +108,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             
             {/* Logout Button */}
             <div className="mt-3">
-              <button className="w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl text-blue-100 hover:bg-blue-700 hover:text-white transition-all duration-200">
+              <button onClick={logout} className="w-full flex items-center px-4 py-3 text-sm font-medium rounded-xl text-blue-100 hover:bg-blue-700 hover:text-white transition-all duration-200">
                 <LogOut className="ml-3 h-5 w-5" />
                 تسجيل الخروج
               </button>

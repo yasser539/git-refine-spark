@@ -4,21 +4,17 @@ import Layout from "../components/Layout";
 import EmployeeCard from "../components/EmployeeCard";
 import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
+import type { User, Permissions } from "../../lib/supabase";
 import { 
   Shield, 
   Users, 
   Package, 
-  DollarSign, 
-  FileText, 
-  Bell, 
   MessageSquare,
   CheckCircle,
   XCircle,
-  Edit,
   Save,
   X,
   UserCheck,
-  Settings,
   Lock,
   Unlock,
   Home,
@@ -26,15 +22,16 @@ import {
   Building,
   BarChart3,
   Activity,
-  Warehouse
+  Bell
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export default function PermissionsPage() {
   const { user, permissions, isAdminWithAllPermissions, getAllEmployees, getEmployeePermissions, updateEmployeePermissions } = useAuth();
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [tempPermissions, setTempPermissions] = useState<any>(null);
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [tempPermissions, setTempPermissions] = useState<Permissions | null>(null);
+  const [employees, setEmployees] = useState<User[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
   // جلب الموظفين عند تحميل الصفحة
@@ -57,7 +54,15 @@ export default function PermissionsPage() {
     }
   }, [getAllEmployees, user?.role]);
 
-  const permissionsList = [
+  type PermissionKey = keyof Permissions;
+  const permissionsList: {
+    key: PermissionKey;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+    admin: boolean;
+    employee: boolean;
+  }[] = [
     // صلاحيات أساسية
     {
       key: 'can_view_dashboard',
@@ -159,22 +164,7 @@ export default function PermissionsPage() {
       admin: true,
       employee: false
     },
-    {
-      key: 'can_view_inventory',
-      title: 'عرض المخزون',
-      description: 'إمكانية عرض إدارة المخزون',
-      icon: Warehouse,
-      admin: true,
-      employee: true
-    },
-    {
-      key: 'can_modify_inventory',
-      title: 'تعديل المخزون',
-      description: 'إمكانية إدارة المخزون والكميات',
-      icon: Warehouse,
-      admin: true,
-      employee: false
-    },
+
     
     // صلاحيات التقارير والمراقبة
     {
@@ -219,6 +209,9 @@ export default function PermissionsPage() {
       admin: true,
       employee: false
     },
+    
+    // صلاحيات الدعم
+
     {
       key: 'can_view_support',
       title: 'عرض الدعم',
@@ -257,7 +250,7 @@ export default function PermissionsPage() {
         await updateEmployeePermissions(selectedEmployee, tempPermissions);
         setIsEditing(false);
         setSelectedEmployee(null);
-        setTempPermissions({});
+    setTempPermissions(null);
         alert('تم حفظ الصلاحيات بنجاح!');
       } catch (error) {
         console.error('خطأ في حفظ الصلاحيات:', error);
@@ -269,16 +262,17 @@ export default function PermissionsPage() {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setSelectedEmployee(null);
-    setTempPermissions({});
+  setTempPermissions(null);
   };
 
   // منع تعديل صلاحيات الأدمن
-  const togglePermission = (permissionKey: string) => {
+  const togglePermission = (permissionKey: PermissionKey) => {
     if (tempPermissions && selectedEmployee) {
-      setTempPermissions({
-        ...tempPermissions,
-        [permissionKey]: !tempPermissions[permissionKey]
-      });
+      setTempPermissions(prev => (
+        prev
+          ? { ...prev, [permissionKey]: !Boolean(prev[permissionKey as keyof Permissions]) }
+          : prev
+      ));
     }
   };
 
@@ -417,14 +411,8 @@ export default function PermissionsPage() {
               <div className={`w-3 h-3 rounded-full ${permissions.can_add_products ? 'bg-green-500' : 'bg-gray-300'}`}></div>
               <span>إضافة المنتجات</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${permissions.can_view_inventory ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <span>المخزون</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${permissions.can_modify_inventory ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <span>تعديل المخزون</span>
-            </div>
+            
+            
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${permissions.can_view_reports ? 'bg-green-500' : 'bg-gray-300'}`}></div>
               <span>التقارير</span>
@@ -436,14 +424,6 @@ export default function PermissionsPage() {
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${permissions.can_view_audit_log ? 'bg-green-500' : 'bg-gray-300'}`}></div>
               <span>سجل العمليات</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${permissions.can_view_notifications ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <span>الإشعارات</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${permissions.can_send_notifications ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <span>إرسال الإشعارات</span>
             </div>
             <div className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${permissions.can_view_support ? 'bg-green-500' : 'bg-gray-300'}`}></div>
@@ -514,23 +494,23 @@ export default function PermissionsPage() {
                       <button
                         onClick={() => selectedEmployee && togglePermission(permission.key)}
                         className={`p-2 rounded-lg transition-colors ${
-                          tempPermissions?.[permission.key]
+                          tempPermissions?.[permission.key as PermissionKey]
                             ? 'bg-green-100 text-green-600'
                             : 'bg-gray-100 text-gray-600'
                         }`}
                         disabled={!selectedEmployee}
                       >
-                        {tempPermissions?.[permission.key] ? <Unlock size={16} /> : <Lock size={16} />}
+                        {tempPermissions?.[permission.key as PermissionKey] ? <Unlock size={16} /> : <Lock size={16} />}
                       </button>
                     </div>
                     <p className="text-sm text-gray-600">{permission.description}</p>
                     <div className="mt-2 flex items-center gap-2">
                       <span className={`px-2 py-1 text-xs rounded-full ${
-                        tempPermissions?.[permission.key]
+                        tempPermissions?.[permission.key as PermissionKey]
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {tempPermissions?.[permission.key] ? 'مفعلة' : 'معطلة'}
+                        {tempPermissions?.[permission.key as PermissionKey] ? 'مفعلة' : 'معطلة'}
                       </span>
                     </div>
                   </div>

@@ -88,7 +88,7 @@ export const storageService = {
       return data.map(file => {
         const { data: urlData } = supabase.storage
           .from('img')
-          .getPublicUrl(`img/${file.name}`);
+          .getPublicUrl(`${file.name}`);
         return urlData.publicUrl;
       });
     } catch (error) {
@@ -107,10 +107,9 @@ export const databaseService = {
   async testConnection() {
     try {
       console.log('Testing database connection...');
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from('customers')
-        .select('count')
-        .limit(1);
+        .select('*', { count: 'exact', head: true });
 
       if (error) {
         console.error('Database connection test failed:', error);
@@ -507,21 +506,7 @@ export const databaseService = {
     }
   },
 
-  // جلب الإشعارات من قاعدة البيانات
-  async getNotifications() {
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return [];
-    }
-  },
 
   // جلب التقارير من قاعدة البيانات
   async getReports() {
@@ -588,13 +573,13 @@ export const databaseService = {
 
       // حساب الإحصائيات
       const totalOrders = ordersData.length;
-      const totalRevenue = ordersData.reduce((sum: number, order: any) => sum + (order.total_amount || 0), 0);
+      const totalRevenue = ordersData.reduce((sum: number, order: Record<string, unknown>) => sum + ((order.total_amount as number) || 0), 0);
       const totalCustomers = customersData.length;
       const totalDrivers = driversData.length;
-      const activeOrders = ordersData.filter((order: any) => 
-        order.status === 'pending' || order.status === 'delivering'
+      const activeOrders = ordersData.filter((order: Record<string, unknown>) => 
+        order.status === 'pending' || order.status === 'out_for_delivery'
       ).length;
-      const completedOrders = ordersData.filter((order: any) => 
+      const completedOrders = ordersData.filter((order: Record<string, unknown>) => 
         order.status === 'delivered'
       ).length;
 
@@ -847,6 +832,10 @@ export async function deleteAlert(id: string): Promise<boolean> {
   }
 }
 
+
+
+
+
 // =====================================================
 // NOTIFICATIONS SERVICES - خدمات الإشعارات
 // =====================================================
@@ -950,7 +939,7 @@ export async function deleteNotification(id: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error deleting notification:', error);
-    return false;
+    throw error;
   }
 }
 
