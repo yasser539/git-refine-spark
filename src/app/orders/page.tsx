@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { deliveryCaptainsService } from "@/lib/supabase-services";
+import { deliveryCaptainsService, ordersService } from "@/lib/supabase-services";
 import { databaseService } from "@/lib/database-services";
 
 interface Order {
@@ -76,148 +76,7 @@ export default function OrdersManagement() {
   const isMerchants = pathname?.includes("/orders/merchants");
   const isCustomers = pathname?.includes("/orders/customers");
   const { permissions, user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([
-    // أمثلة لطلبات التجار لعرض فصل القوائم
-    {
-      id: "M-ORD-5001",
-      customerName: "متجر الندى",
-      customerPhone: "+966555001001",
-      customerAddress: "سجل تجاري: 123456789 | جدة",
-      source: 'merchant',
-      items: [
-        { name: "توريد كراتين مياه 200 مل", quantity: 20, price: 10.0 },
-        { name: "توريد كراتين مياه 600 مل", quantity: 10, price: 14.0 }
-      ],
-      total: 340.0,
-      status: "قيد المراجعة",
-      paymentMethod: "محفظة إلكترونية",
-      createdAt: "2024-01-20 12:00",
-      isVisibleToDrivers: false
-    },
-    {
-      id: "M-ORD-5002",
-      customerName: "متجر الصفوة",
-      customerPhone: "+966555002002",
-      customerAddress: "سجل تجاري: 987654321 | الرياض",
-      source: 'merchant',
-      items: [
-        { name: "توريد كراتين مياه 330 مل", quantity: 15, price: 11.5 }
-      ],
-      total: 172.5,
-      status: "تم الموافقة وجاري البحث عن موصل",
-      paymentMethod: "بطاقة",
-      createdAt: "2024-01-20 12:15",
-      isVisibleToDrivers: true
-    },
-    {
-      id: "ORD-12345",
-      customerName: "سارة أحمد",
-      customerPhone: "+966501112223",
-      customerAddress: "شارع الملك فهد، الرياض",
-      source: 'customer',
-      driverName: "محمد علي",
-      driverPhone: "+966501234567",
-      items: [
-        { name: "مياه طبيعية", quantity: 2, price: 5.00 },
-        { name: "مياه معدنية", quantity: 1, price: 7.50 }
-      ],
-      total: 17.50,
-      status: "قيد الانتظار",
-      paymentMethod: "بطاقة",
-      createdAt: "2024-01-20 14:30",
-      estimatedDelivery: "2024-01-20 15:30",
-      assignedDriverId: "driver-001",
-      isVisibleToDrivers: false
-    },
-    {
-      id: "ORD-12346",
-      customerName: "فاطمة محمد",
-      customerPhone: "+966502223334",
-      customerAddress: "حي النزهة، الرياض",
-      source: 'customer',
-      items: [
-        { name: "مياه فوارة", quantity: 3, price: 8.00 }
-      ],
-      total: 24.00,
-      status: "قيد المراجعة",
-      paymentMethod: "نقدي",
-      createdAt: "2024-01-20 14:45",
-      isVisibleToDrivers: false
-    },
-    {
-      id: "ORD-12347",
-      customerName: "خالد عبدالله",
-      customerPhone: "+966503334445",
-      customerAddress: "حي الملقا، الرياض",
-      source: 'customer',
-      driverName: "أحمد حسن",
-      driverPhone: "+966507654321",
-      items: [
-        { name: "مياه نكهة الليمون", quantity: 1, price: 6.50 },
-        { name: "مياه طبيعية", quantity: 2, price: 5.00 }
-      ],
-      total: 16.50,
-      status: "تم التوصيل",
-      paymentMethod: "محفظة إلكترونية",
-      createdAt: "2024-01-20 13:00",
-      estimatedDelivery: "2024-01-20 14:00",
-      actualDelivery: "2024-01-20 13:45",
-      assignedDriverId: "driver-002",
-      isVisibleToDrivers: false
-    },
-    {
-      id: "ORD-12348",
-      customerName: "علي محمد",
-      customerPhone: "+966504445556",
-      customerAddress: "حي العليا، الرياض",
-      source: 'customer',
-      items: [
-        { name: "مياه معدنية", quantity: 2, price: 7.50 },
-        { name: "مياه فوارة", quantity: 1, price: 8.00 }
-      ],
-      total: 23.00,
-      status: "تم الموافقة وجاري البحث عن موصل",
-      paymentMethod: "بطاقة",
-      createdAt: "2024-01-20 12:30",
-      isVisibleToDrivers: true
-    },
-    {
-      id: "ORD-12349",
-      customerName: "نور الهدى",
-      customerPhone: "+966505556667",
-      customerAddress: "حي الورود، الرياض",
-      source: 'customer',
-      driverName: "علي أحمد",
-      driverPhone: "+966509876543",
-      items: [
-        { name: "مياه طبيعية", quantity: 1, price: 5.00 },
-        { name: "مياه نكهة البرتقال", quantity: 2, price: 6.50 }
-      ],
-      total: 18.00,
-      status: "في الطريق إليك",
-      paymentMethod: "نقدي",
-      createdAt: "2024-01-20 15:00",
-      estimatedDelivery: "2024-01-20 16:00",
-      assignedDriverId: "driver-003",
-      isVisibleToDrivers: false
-    },
-    {
-      id: "ORD-12350",
-      customerName: "أحمد محمد",
-      customerPhone: "+966506667778",
-      customerAddress: "حي الملك عبدالله، الرياض",
-      source: 'customer',
-      items: [
-        { name: "مياه معدنية", quantity: 3, price: 7.50 },
-        { name: "مياه فوارة", quantity: 1, price: 8.00 }
-      ],
-      total: 30.50,
-      status: "قيد المراجعة",
-      paymentMethod: "محفظة إلكترونية",
-      createdAt: "2024-01-20 15:15",
-      isVisibleToDrivers: false
-    }
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("الكل");
@@ -288,6 +147,84 @@ export default function OrdersManagement() {
       isMounted = false;
     };
   }, []);
+
+  // جلب الطلبات من قاعدة البيانات (orders الجدول الجديد)
+  useEffect(() => {
+    let isMounted = true;
+
+    const mapDbStatusToUi = (dbStatus?: string | null, approval?: string | null): Order["status"] => {
+      if (!approval || approval !== 'approved' || !dbStatus) {
+        return "قيد المراجعة";
+      }
+      switch (dbStatus) {
+        case 'review_order':
+          return "قيد المراجعة";
+        case 'accept':
+          return "تم الموافقة وجاري البحث عن موصل";
+        case 'choose_delivery_captain':
+          return "قيد الانتظار";
+        case 'delivering':
+          return "في الطريق إليك";
+        case 'delivery_done':
+          return "تم التوصيل";
+        default:
+          return "قيد المراجعة";
+      }
+    };
+
+    const mapDbOrderToUi = (row: any): Order => {
+      const customerName = row.customers?.name ?? row.customer_name ?? "";
+      const customerPhone = row.customers?.phone ?? row.delivery_phone ?? "";
+      const customerAddress = row.delivery_address ?? "";
+      const items: Order["items"] = Array.isArray(row.items)
+        ? row.items.map((it: any) => ({
+            name: it.name ?? it.product_name ?? "منتج",
+            quantity: Number(it.quantity ?? 1),
+            price: Number(it.price ?? it.unit_price ?? 0),
+          }))
+        : [];
+
+      const total = Number(row.final_amount ?? row.total ?? row.total_amount ?? 0);
+      const statusUi = mapDbStatusToUi(row.status, row.approval_status);
+      const driverName = row.employees?.name ?? null;
+      const driverPhone = row.employees?.phone ?? null;
+
+      // استنتاج نوع المصدر: إذا كان هناك merchant_id => تاجر، وإلا عميل
+      const source: 'customer' | 'merchant' = row.merchant_id ? 'merchant' : 'customer';
+
+      return {
+        id: row.id,
+        customerName,
+        customerPhone,
+        customerAddress,
+        source,
+        driverName: driverName ?? undefined,
+        driverPhone: driverPhone ?? undefined,
+        items,
+        total,
+        status: statusUi,
+        paymentMethod: "نقدي", // لا يوجد حقل صريح في المخطط الحالي
+        createdAt: row.created_at ?? "",
+        estimatedDelivery: row.estimated_delivery_time ?? undefined,
+        actualDelivery: row.actual_delivery_time ?? undefined,
+        assignedDriverId: row.deliverer_id ?? undefined,
+        isVisibleToDrivers: ['accept', 'choose_delivery_captain'].includes(row.status ?? '')
+      };
+    };
+
+    (async () => {
+      try {
+        const data = await ordersService.getAllOrders();
+        if (!isMounted) return;
+        const mapped: Order[] = (Array.isArray(data) ? data : []).map(mapDbOrderToUi);
+        setOrders(mapped);
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+      }
+    })();
+
+    return () => { isMounted = false; };
+  }, [isCustomers, isMerchants]);
 
   const filteredOrders = orders
     // فلترة حسب نوع الصفحة: التجار أو العملاء
