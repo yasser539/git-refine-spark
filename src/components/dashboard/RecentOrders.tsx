@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 
@@ -70,9 +69,17 @@ export function RecentOrders() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{order.id}</span>
-                  <Badge variant={statusVariants[order.status].variant}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    order.status === "delivered" 
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                      : order.status === "cancelled" 
+                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
+                      : order.status === "in_progress"
+                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                  }`}>
                     {statusVariants[order.status].label}
-                  </Badge>
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   العميل: {order.customer}
