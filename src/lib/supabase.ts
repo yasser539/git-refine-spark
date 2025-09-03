@@ -1,5 +1,20 @@
-// Re-export types from the centralized types file
-export * from '@/types'
+import { createClient } from '@supabase/supabase-js'
 
-// Re-export supabase client
-export { supabase } from '@/lib/supabase-client'
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+})
+
+// Re-export types
+export * from '@/types'

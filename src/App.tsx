@@ -1,22 +1,39 @@
-import { Toaster } from "@/components/ui/toaster";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from '@/context/AuthContext'
+import { Toaster } from '@/components/ui/toaster'
+import DashboardLayout from '@/components/layout/DashboardLayout'
+import Dashboard from '@/pages/Dashboard'
+import OrdersPage from '@/pages/Orders'
+import DeliveryPage from '@/pages/Delivery'
+import NotificationsPage from '@/pages/Notifications'
+import CustomersPage from '@/pages/Customers'
+import MerchantsPage from '@/pages/Merchants'
+import ProductsPage from '@/pages/Products'
+import ReportsPage from '@/pages/Reports'
+import './App.css'
 
-const queryClient = new QueryClient();
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-background" dir="rtl">
+          <Routes>
+            <Route path="/" element={<DashboardLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="orders" element={<OrdersPage />} />
+              <Route path="delivery" element={<DeliveryPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="customers" element={<CustomersPage />} />
+              <Route path="merchants" element={<MerchantsPage />} />
+              <Route path="products" element={<ProductsPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+            </Route>
+          </Routes>
+          <Toaster />
+        </div>
+      </Router>
+    </AuthProvider>
+  )
+}
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <Toaster />
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
-  </QueryClientProvider>
-);
-
-export default App;
+export default App
